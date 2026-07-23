@@ -92,8 +92,7 @@ export interface ScriptAnalysis2 {
 export interface ConceptSummary {
   id: string
   date: DateKey
-  transcript: string
-  summary: string
+  messages: { role: 'user' | 'model'; text: string }[]
   createdAt: number
 }
 

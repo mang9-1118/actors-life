@@ -10,13 +10,13 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 
 export function Settings() {
-  const geminiApiKey = useSettingsStore((s) => s.geminiApiKey)
-  const setGeminiApiKey = useSettingsStore((s) => s.setGeminiApiKey)
-  const [draftKey, setDraftKey] = useState(geminiApiKey)
+  const appAccessKey = useSettingsStore((s) => s.appAccessKey)
+  const setAppAccessKey = useSettingsStore((s) => s.setAppAccessKey)
+  const [draftKey, setDraftKey] = useState(appAccessKey)
   const [savedKey, setSavedKey] = useState(false)
 
   const saveKey = () => {
-    setGeminiApiKey(draftKey.trim())
+    setAppAccessKey(draftKey.trim())
     setSavedKey(true)
     setTimeout(() => setSavedKey(false), 1500)
   }
@@ -123,18 +123,21 @@ export function Settings() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">Gemini API 키</CardTitle>
+          <CardTitle className="text-lg">AI 기능 (Gemini)</CardTitle>
         </CardHeader>
         <CardContent className="flex flex-col gap-3">
           <p className="text-sm text-muted-foreground">
-            입력한 키는 이 브라우저의 로컬 스토리지에만 저장되며, 개념 정리 요약·강의 분석·주간
-            AI 코멘트 기능에서 직접 Gemini API 호출에 사용됩니다.
+            Gemini API 키는 더 이상 브라우저에 저장하지 않고, Vercel 프로젝트의 서버 환경변수(
+            <code>GEMINI_API_KEY</code>)로만 보관되어 <code>/api/gemini</code> 함수를 통해서만
+            사용됩니다. 배포된 주소를 아는 다른 사람이 이 함수를 쓰지 못하도록 막고 싶다면, Vercel
+            환경변수에 <code>APP_ACCESS_KEY</code>를 설정하고 아래에 동일한 값을 입력하세요.
+            설정하지 않으면 이 검증은 건너뜁니다.
           </p>
           <Input
             type="password"
             value={draftKey}
             onChange={(e) => setDraftKey(e.target.value)}
-            placeholder="Gemini API 키 입력"
+            placeholder="APP_ACCESS_KEY와 동일한 값 (선택)"
           />
           <Button onClick={saveKey} className="self-start">
             {savedKey ? '저장됨' : '저장'}

@@ -1,8 +1,5 @@
 import { useSettingsStore } from '@/stores/useSettingsStore'
 
-const MODEL = 'gemini-2.5-flash'
-const API_BASE = 'https://generativelanguage.googleapis.com/v1beta/models'
-
 export class GeminiError extends Error {}
 
 export interface GeminiPart {
@@ -15,24 +12,24 @@ export interface GeminiTurn {
   parts: GeminiPart[]
 }
 
+/** Calls the `/api/gemini` Vercel function so the Gemini API key never ships to the client. */
 export async function generateContent(contents: GeminiTurn[]): Promise<string> {
-  const apiKey = useSettingsStore.getState().geminiApiKey
-  if (!apiKey) {
-    throw new GeminiError('Gemini API 키가 설정되지 않았습니다. 설정 탭에서 먼저 입력해주세요.')
-  }
+  const appAccessKey = useSettingsStore.getState().appAccessKey
 
-  const res = await fetch(`${API_BASE}/${MODEL}:generateContent?key=${apiKey}`, {
+  const res = await fetch('/api/gemini', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      ...(appAccessKey ? { 'x-app-key': appAccessKey } : {}),
+    },
     body: JSON.stringify({ contents }),
   })
 
+  const data = await res.json().catch(() => null)
   if (!res.ok) {
-    const body = await res.text().catch(() => '')
-    throw new GeminiError(`Gemini API 요청이 실패했습니다 (${res.status}). ${body}`.trim())
+    throw new GeminiError(data?.error ?? `Gemini API 요청이 실패했습니다 (${res.status}).`)
   }
 
-  const data = await res.json()
   const text = data?.candidates?.[0]?.content?.parts
     ?.map((p: GeminiPart) => p.text ?? '')
     .join('')
@@ -48,21 +45,43 @@ function userTurn(parts: GeminiPart[]): GeminiTurn[] {
   return [{ role: 'user', parts }]
 }
 
-export function summarizeTranscript(transcript: string, customInstruction?: string): Promise<string> {
+const CONCEPT_TUTOR_RULES =
+  '학생의 설명에서 이해가 안 되거나 불충분하게 설명된 부분이 있으면 그 부분에 대해서만 ' +
+  '짧고 간결하게 질문해줘. 칭찬이나 인정 같은 미사여구는 쓰지 말고, ' +
+  '관련 추가 정보나 보충 설명도 제공하지 마. 오직 부족한 부분에 대한 질문만 해. ' +
+  '질문할 부분이 처음부터 없거나, 이미 질문과 답변을 충분히 주고받아서 더 이상 짚을 부분이 없다면 ' +
+  '새로운 질문을 계속 만들어내지 말고, "여기까지 하면 충분히 이해하신 것 같아요"처럼 짧은 마무리 말만 건네줘.'
+
+export function analyzeConceptTranscript(
+  transcript: string,
+  customInstruction?: string,
+): Promise<string> {
   const instruction = customInstruction?.trim()
   return generateContent(
     userTurn([
       {
         text:
-          '다음은 배우가 연기/보컬 훈련 중 음성으로 말한 학습 내용입니다. ' +
-          '핵심 내용을 한국어 불릿포인트 3~5개로 간결하게 요약해줘.\n\n' +
-          transcript +
+          '너는 배우 훈련생을 지도하는 연기/보컬 트레이닝 튜터야. ' +
+          '다음은 학생이 음성으로 말한 개념 정리 내용(전사문)이야.\n\n' +
+          `${transcript}\n\n` +
+          `${CONCEPT_TUTOR_RULES}` +
           (instruction
-            ? `\n\n요약을 작성할 때 다음 사용자 지정 기준을 반드시 참고해줘:\n${instruction}`
+            ? `\n\n답변을 작성할 때 다음 사용자 지정 기준을 반드시 참고해줘:\n${instruction}`
             : ''),
       },
     ]),
   )
+}
+
+export function continueConceptChat(
+  history: { role: 'user' | 'model'; text: string }[],
+  answer: string,
+): Promise<string> {
+  const contents: GeminiTurn[] = [
+    ...history.map((m) => ({ role: m.role, parts: [{ text: m.text }] })),
+    { role: 'user', parts: [{ text: `${answer}\n\n(${CONCEPT_TUTOR_RULES})` }] },
+  ]
+  return generateContent(contents)
 }
 
 const LECTURE_QUESTION_MARKER = '[이해도 확인 질문]'
