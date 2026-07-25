@@ -6,6 +6,7 @@ import type {
   LectureAnalysisEntry,
   ScriptAnalysis1,
   ScriptAnalysis2,
+  TrainingTabId,
 } from '@/types'
 
 interface AnalysisState {
@@ -15,6 +16,7 @@ interface AnalysisState {
   lectureAnalyses: LectureAnalysisEntry[]
   weeklyComments: Partial<Record<DateKey, string>>
   weeklyCommentPrompt: string
+  weeklyGoalHours: Partial<Record<TrainingTabId, number>>
   lectureAnalysisPrompt: string
   conceptSummaryPrompt: string
 
@@ -36,6 +38,7 @@ interface AnalysisState {
 
   setWeeklyComment: (weekKey: DateKey, comment: string) => void
   setWeeklyCommentPrompt: (prompt: string) => void
+  setWeeklyGoalHours: (goals: Partial<Record<TrainingTabId, number>>) => void
   setLectureAnalysisPrompt: (prompt: string) => void
   setConceptSummaryPrompt: (prompt: string) => void
 }
@@ -83,6 +86,7 @@ export const useAnalysisStore = create<AnalysisState>()(
       lectureAnalyses: [],
       weeklyComments: {},
       weeklyCommentPrompt: '',
+      weeklyGoalHours: {},
       lectureAnalysisPrompt: '',
       conceptSummaryPrompt: '',
 
@@ -160,6 +164,7 @@ export const useAnalysisStore = create<AnalysisState>()(
         set((state) => ({ weeklyComments: { ...state.weeklyComments, [weekKey]: comment } })),
 
       setWeeklyCommentPrompt: (prompt) => set({ weeklyCommentPrompt: prompt }),
+      setWeeklyGoalHours: (goals) => set({ weeklyGoalHours: goals }),
       setLectureAnalysisPrompt: (prompt) => set({ lectureAnalysisPrompt: prompt }),
       setConceptSummaryPrompt: (prompt) => set({ conceptSummaryPrompt: prompt }),
     }),

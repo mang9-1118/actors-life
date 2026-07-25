@@ -134,18 +134,25 @@ export async function continueLectureChat(
 export function generateWeeklyComment(summary: {
   weekLabel: string
   totalHours: number
-  byCategory: { label: string; hours: number; previousHours: number }[]
+  byCategory: { label: string; hours: number; previousHours: number; goalHours: number }[]
   goalAchievedDays: number
   totalDays: number
   upcomingAuditions: { title: string; deadline: string }[]
   customInstruction?: string
 }): Promise<string> {
+  const hasGoals = summary.byCategory.some((c) => c.goalHours > 0)
   const breakdown = summary.byCategory
     .map((c) => {
       const delta = Math.round((c.hours - c.previousHours) * 10) / 10
       const deltaText =
         delta === 0 ? '지난주와 동일' : `지난주 대비 ${delta > 0 ? '+' : ''}${delta.toFixed(1)}시간`
-      return `- ${c.label}: ${c.hours.toFixed(1)}시간 (${deltaText}, 지난주 ${c.previousHours.toFixed(1)}시간)`
+      const goalText =
+        c.goalHours > 0
+          ? c.hours >= c.goalHours
+            ? `, 목표 ${c.goalHours.toFixed(1)}시간 달성`
+            : `, 목표 ${c.goalHours.toFixed(1)}시간 대비 ${(c.goalHours - c.hours).toFixed(1)}시간 부족`
+          : ''
+      return `- ${c.label}: ${c.hours.toFixed(1)}시간 (${deltaText}, 지난주 ${c.previousHours.toFixed(1)}시간${goalText})`
     })
     .join('\n')
   const auditionsText = summary.upcomingAuditions.length
@@ -166,6 +173,10 @@ export function generateWeeklyComment(summary: {
           '2) 데이터에 근거한 구체적인 실행 조언 2~3가지 (예: "발성이 지난주보다 2시간 줄었으니 다음 주엔 하루 30분씩 더 투자해보세요"처럼 구체적인 시간·수치를 포함)\n' +
           '다가오는 오디션이 있다면 그 일정에 맞춰 어떤 훈련에 우선순위를 둘지도 조언에 포함해줘. ' +
           '이모지는 쓰지 말고, 격려하는 톤을 유지하되 추상적인 말 대신 구체적인 수치와 행동을 제시해줘.' +
+          (hasGoals
+            ? ' 카테고리별로 목표 시간이 설정되어 있으니, 목표를 채운 카테고리보다 목표에 못 미친 카테고리를 우선적으로 짚어주고, ' +
+              '부족한 시간을 채우려면 남은 요일에 하루 몇 분씩 더 투자해야 하는지 구체적으로 제안해줘. 목표가 설정되지 않은 카테고리는 지난주 대비 변화만 언급해줘.'
+            : '') +
           (customInstruction
             ? `\n\n코멘트를 작성할 때 다음 사용자 지정 기준을 반드시 참고해줘:\n${customInstruction}`
             : ''),

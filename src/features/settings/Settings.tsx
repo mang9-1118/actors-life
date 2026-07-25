@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Eye, EyeOff } from 'lucide-react'
 import { useSettingsStore } from '@/stores/useSettingsStore'
 import { useTabColorStore, useTabColors } from '@/stores/useTabColorStore'
 import {
@@ -19,6 +20,7 @@ export function Settings() {
   const setAppAccessKey = useSettingsStore((s) => s.setAppAccessKey)
   const [draftKey, setDraftKey] = useState(appAccessKey)
   const [savedKey, setSavedKey] = useState(false)
+  const [showKey, setShowKey] = useState(false)
 
   const saveKey = () => {
     setAppAccessKey(draftKey.trim())
@@ -134,12 +136,24 @@ export function Settings() {
             환경변수에 <code>APP_ACCESS_KEY</code>를 설정하고 아래에 동일한 값을 입력하세요.
             설정하지 않으면 이 검증은 건너뜁니다.
           </p>
-          <Input
-            type="password"
-            value={draftKey}
-            onChange={(e) => setDraftKey(e.target.value)}
-            placeholder="APP_ACCESS_KEY와 동일한 값 (선택)"
-          />
+          <div className="flex gap-2">
+            <Input
+              type={showKey ? 'text' : 'password'}
+              value={draftKey}
+              onChange={(e) => setDraftKey(e.target.value)}
+              placeholder="APP_ACCESS_KEY와 동일한 값 (선택)"
+              className="flex-1"
+            />
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              aria-label={showKey ? '키 숨기기' : '키 보기'}
+              onClick={() => setShowKey((v) => !v)}
+            >
+              {showKey ? <EyeOff /> : <Eye />}
+            </Button>
+          </div>
           <Button onClick={saveKey} className="self-start">
             {savedKey ? '저장됨' : '저장'}
           </Button>

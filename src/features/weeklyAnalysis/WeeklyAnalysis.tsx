@@ -12,6 +12,8 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Textarea } from '@/components/ui/textarea'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { useTimerStore } from '@/stores/useTimerStore'
 import { useAuditionStore } from '@/stores/useAuditionStore'
 import { useAnalysisStore } from '@/stores/useAnalysisStore'
@@ -63,16 +65,19 @@ export function WeeklyAnalysis() {
   const setWeeklyComment = useAnalysisStore((s) => s.setWeeklyComment)
   const weeklyCommentPrompt = useAnalysisStore((s) => s.weeklyCommentPrompt)
   const setWeeklyCommentPrompt = useAnalysisStore((s) => s.setWeeklyCommentPrompt)
+  const weeklyGoalHours = useAnalysisStore((s) => s.weeklyGoalHours)
+  const setWeeklyGoalHours = useAnalysisStore((s) => s.setWeeklyGoalHours)
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()))
   const [loadingComment, setLoadingComment] = useState(false)
   const [commentError, setCommentError] = useState('')
   const [promptDialogOpen, setPromptDialogOpen] = useState(false)
   const [draftPrompt, setDraftPrompt] = useState('')
+  const [draftGoalHours, setDraftGoalHours] = useState<Partial<Record<TrainingTabId, number>>>({})
 
   const weekKey = toDateKey(weekStart)
   const dateKeys = useMemo(() => weekDateKeys(weekStart), [weekStart])
 
-  const { data, totalSeconds, avgSeconds } = useMemo(() => {
+  const { data, totalSeconds } = useMemo(() => {
     const rows = orderedTabs.map((tab) => {
       const seconds = dateKeys.reduce((sum, date) => sum + (totals[tab.id]?.[date] ?? 0), 0)
       return {
@@ -83,8 +88,18 @@ export function WeeklyAnalysis() {
       }
     })
     const sum = rows.reduce((acc, r) => acc + r.seconds, 0)
-    return { data: rows, totalSeconds: sum, avgSeconds: sum / 7 }
+    return { data: rows, totalSeconds: sum }
   }, [dateKeys, totals, orderedTabs])
+
+  /** Days elapsed in the viewed week up to today: 7 for fully past weeks, 0 for fully future weeks. */
+  const daysElapsedInWeek = useMemo(() => {
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    const diffDays = Math.floor((today.getTime() - weekStart.getTime()) / 86400000)
+    return Math.min(7, Math.max(0, diffDays + 1))
+  }, [weekStart])
+
+  const avgSeconds = daysElapsedInWeek > 0 ? totalSeconds / daysElapsedInWeek : 0
 
   const previousWeekDateKeys = useMemo(
     () => weekDateKeys(addDays(weekStart, -7)),
@@ -147,6 +162,7 @@ export function WeeklyAnalysis() {
           label: row.category,
           hours: row.hours,
           previousHours: previousHoursByTab[row.tabId] ?? 0,
+          goalHours: weeklyGoalHours[row.tabId] ?? 0,
         })),
         goalAchievedDays,
         totalDays: dateKeys.length,
@@ -231,6 +247,7 @@ export function WeeklyAnalysis() {
               aria-label="AI 코멘트 기준 설정"
               onClick={() => {
                 setDraftPrompt(weeklyCommentPrompt)
+                setDraftGoalHours(weeklyGoalHours)
                 setPromptDialogOpen(true)
               }}
             >
@@ -259,6 +276,30 @@ export function WeeklyAnalysis() {
               AI가 주간 코멘트를 작성할 때 참고할 기준이나 강조하고 싶은 내용을 입력하세요.
             </DialogDescription>
           </DialogHeader>
+          <div className="flex flex-col gap-1.5">
+            <Label>카테고리별 주간 목표 시간 (시간)</Label>
+            <div className="grid grid-cols-2 gap-2">
+              {orderedTabs.map((tab) => (
+                <div key={tab.id} className="flex items-center justify-between gap-2">
+                  <span className="text-sm text-muted-foreground">{tab.label}</span>
+                  <Input
+                    type="number"
+                    min={0}
+                    step={0.5}
+                    value={draftGoalHours[tab.id] ?? ''}
+                    onChange={(e) =>
+                      setDraftGoalHours((prev) => ({
+                        ...prev,
+                        [tab.id]: e.target.value === '' ? undefined : Number(e.target.value),
+                      }))
+                    }
+                    placeholder="미설정"
+                    className="w-20"
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
           <Textarea
             value={draftPrompt}
             onChange={(e) => setDraftPrompt(e.target.value)}
@@ -272,6 +313,7 @@ export function WeeklyAnalysis() {
             <Button
               onClick={() => {
                 setWeeklyCommentPrompt(draftPrompt)
+                setWeeklyGoalHours(draftGoalHours)
                 setPromptDialogOpen(false)
               }}
             >
