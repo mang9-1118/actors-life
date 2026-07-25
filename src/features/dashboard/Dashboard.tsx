@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { ChevronLeft, ChevronRight, Pencil } from 'lucide-react'
+import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -169,28 +169,24 @@ function DailyGoalGauge() {
                   />
                   {tab.label}
                 </span>
-                <span className="font-mono text-muted-foreground">
-                  {formatDuration(seconds)} ({pct.toFixed(1)}%)
-                </span>
-                {!isToday && (
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
+                {isToday ? (
+                  <span className="font-mono text-muted-foreground">
+                    {formatDuration(seconds)} ({pct.toFixed(1)}%)
+                  </span>
+                ) : (
+                  <button
+                    type="button"
                     aria-label={`${tab.label} 기록 시간 수정`}
                     onClick={() => openEdit(tab.id, tab.label)}
+                    className="cursor-pointer rounded-sm font-mono text-muted-foreground underline-offset-4 transition-colors hover:font-semibold hover:text-foreground hover:underline focus-visible:font-semibold focus-visible:text-foreground focus-visible:underline focus-visible:outline-none"
                   >
-                    <Pencil />
-                  </Button>
+                    {formatDuration(seconds)} ({pct.toFixed(1)}%)
+                  </button>
                 )}
               </div>
             )
           })}
         </div>
-        {!isToday && (
-          <p className="text-xs text-muted-foreground">
-            연필 아이콘을 눌러 지나간 날의 카테고리별 기록 시간을 수정할 수 있습니다.
-          </p>
-        )}
       </CardContent>
 
       <Dialog open={editingTab != null} onOpenChange={(open) => !open && setEditingTab(null)}>
