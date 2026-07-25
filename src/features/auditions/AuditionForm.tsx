@@ -15,7 +15,7 @@ export function AuditionForm() {
   const [organization, setOrganization] = useState('')
   const [mode, setMode] = useState<AuditionMode>('offline')
   const [deadline, setDeadline] = useState(todayKey())
-  const [announceDate, setAnnounceDate] = useState(todayKey())
+  const [announceDate, setAnnounceDate] = useState('')
   const [memo, setMemo] = useState('')
 
   const submit = () => {
@@ -31,7 +31,7 @@ export function AuditionForm() {
     setTitle('')
     setOrganization('')
     setDeadline(todayKey())
-    setAnnounceDate(todayKey())
+    setAnnounceDate('')
     setMemo('')
   }
 
