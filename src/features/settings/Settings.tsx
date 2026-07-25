@@ -1,12 +1,13 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useSettingsStore } from '@/stores/useSettingsStore'
 import { useTabColorStore, useTabColors } from '@/stores/useTabColorStore'
 import {
   BackupSyncError,
+  type BackupEntry,
   downloadBackupFromCloud,
-  exportBackupJson,
   importBackupJson,
-  uploadBackupToCloud,
+  listCloudBackups,
+  runQuickBackup,
 } from '@/lib/backup'
 import { TRAINING_TABS } from '@/types'
 import { Button } from '@/components/ui/button'
@@ -26,21 +27,34 @@ export function Settings() {
   }
 
   const lastSyncedAt = useSettingsStore((s) => s.lastSyncedAt)
-  const setLastSyncedAt = useSettingsStore((s) => s.setLastSyncedAt)
 
-  const [syncBusy, setSyncBusy] = useState<'backup' | 'restore' | null>(null)
+  const [backups, setBackups] = useState<BackupEntry[]>([])
+  const [backupsError, setBackupsError] = useState('')
+  const [syncBusy, setSyncBusy] = useState<'backup' | string | null>(null)
   const [syncError, setSyncError] = useState('')
   const [syncNotice, setSyncNotice] = useState('')
+
+  const refreshBackupList = async () => {
+    try {
+      setBackups(await listCloudBackups())
+      setBackupsError('')
+    } catch (e) {
+      setBackupsError(e instanceof BackupSyncError ? e.message : '백업 목록을 불러오지 못했습니다.')
+    }
+  }
+
+  useEffect(() => {
+    refreshBackupList()
+  }, [])
 
   const backupNow = async () => {
     setSyncBusy('backup')
     setSyncError('')
     setSyncNotice('')
     try {
-      const content = exportBackupJson()
-      const updatedAt = await uploadBackupToCloud(content)
-      setLastSyncedAt(updatedAt)
+      await runQuickBackup()
       setSyncNotice('백업이 저장되었습니다.')
+      await refreshBackupList()
     } catch (e) {
       setSyncError(e instanceof BackupSyncError ? e.message : '백업 중 오류가 발생했습니다.')
     } finally {
@@ -48,21 +62,20 @@ export function Settings() {
     }
   }
 
-  const restoreFromCloud = async () => {
-    if (!window.confirm('저장된 백업으로 복원하면 현재 기기에 저장된 데이터를 덮어씁니다. 계속할까요?')) {
+  const restoreFromCloud = async (id: string) => {
+    if (!window.confirm('선택한 백업으로 복원하면 현재 기기에 저장된 데이터를 덮어씁니다. 계속할까요?')) {
       return
     }
-    setSyncBusy('restore')
+    setSyncBusy(id)
     setSyncError('')
     setSyncNotice('')
     try {
-      const result = await downloadBackupFromCloud()
+      const result = await downloadBackupFromCloud(id)
       if (!result) {
-        setSyncError('저장된 백업이 아직 없습니다.')
+        setSyncError('해당 백업을 찾을 수 없습니다. 목록을 새로고침해주세요.')
         return
       }
       importBackupJson(result.content)
-      setLastSyncedAt(result.updatedAt)
       window.location.reload()
     } catch (e) {
       setSyncError(e instanceof BackupSyncError ? e.message : '복원 중 오류가 발생했습니다.')
@@ -148,9 +161,6 @@ export function Settings() {
             <Button onClick={backupNow} disabled={syncBusy != null}>
               {syncBusy === 'backup' ? '백업 중...' : '지금 백업'}
             </Button>
-            <Button variant="outline" onClick={restoreFromCloud} disabled={syncBusy != null}>
-              {syncBusy === 'restore' ? '복원 중...' : '백업에서 복원'}
-            </Button>
           </div>
 
           {syncError && <p className="text-sm text-destructive">{syncError}</p>}
@@ -160,6 +170,32 @@ export function Settings() {
               마지막 동기화: {new Date(lastSyncedAt).toLocaleString('ko-KR')}
             </p>
           )}
+
+          <div className="flex flex-col gap-1.5 pt-2">
+            <p className="text-sm font-medium text-foreground">최근 백업 (최대 3개)</p>
+            {backupsError && <p className="text-sm text-destructive">{backupsError}</p>}
+            {!backupsError && backups.length === 0 && (
+              <p className="text-sm text-muted-foreground">아직 저장된 백업이 없습니다.</p>
+            )}
+            {backups.map((backup) => (
+              <div
+                key={backup.id}
+                className="flex items-center justify-between gap-2 rounded-lg bg-muted px-3 py-2"
+              >
+                <span className="text-sm text-foreground">
+                  {new Date(backup.updatedAt).toLocaleString('ko-KR')}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => restoreFromCloud(backup.id)}
+                  disabled={syncBusy != null}
+                >
+                  {syncBusy === backup.id ? '복원 중...' : '이 시점으로 복원'}
+                </Button>
+              </div>
+            ))}
+          </div>
         </CardContent>
       </Card>
     </div>

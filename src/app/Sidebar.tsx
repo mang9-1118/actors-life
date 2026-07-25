@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { NavLink } from 'react-router-dom'
 import {
   DndContext,
@@ -16,10 +17,11 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { GripVertical, PanelLeftClose, PanelLeftOpen } from 'lucide-react'
+import { CloudBackup, GripVertical, PanelLeftClose, PanelLeftOpen } from 'lucide-react'
 import { useOrderedTrainingTabs, useTabOrderStore } from '@/stores/useTabOrderStore'
 import { useOrderedOtherTabs, useOtherTabOrderStore } from '@/stores/useOtherTabOrderStore'
 import { useSidebarStore } from '@/stores/useSidebarStore'
+import { runQuickBackup } from '@/lib/backup'
 
 const linkClass = ({ isActive }: { isActive: boolean }) =>
   `block rounded-lg px-4 py-2 text-sm transition-colors ${
@@ -121,6 +123,44 @@ function OtherTabList() {
   )
 }
 
+function QuickBackupButton() {
+  const [status, setStatus] = useState<'idle' | 'busy' | 'done' | 'error'>('idle')
+
+  const runBackup = async () => {
+    if (status === 'busy') return
+    setStatus('busy')
+    try {
+      await runQuickBackup()
+      setStatus('done')
+    } catch {
+      setStatus('error')
+    } finally {
+      setTimeout(() => setStatus('idle'), 1500)
+    }
+  }
+
+  const label =
+    status === 'busy' ? '백업 중...' : status === 'done' ? '백업 완료' : status === 'error' ? '백업 실패' : '지금 백업'
+
+  return (
+    <button
+      onClick={runBackup}
+      disabled={status === 'busy'}
+      aria-label={label}
+      title={label}
+      className={`flex size-9 items-center justify-center rounded-lg transition-colors ${
+        status === 'error'
+          ? 'text-destructive hover:bg-sidebar-accent'
+          : status === 'done'
+            ? 'text-primary hover:bg-sidebar-accent'
+            : 'text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
+      }`}
+    >
+      <CloudBackup className="size-4" />
+    </button>
+  )
+}
+
 export function Sidebar() {
   const collapsed = useSidebarStore((s) => s.collapsed)
   const toggle = useSidebarStore((s) => s.toggle)
@@ -135,17 +175,20 @@ export function Sidebar() {
         >
           <PanelLeftOpen className="size-5" />
         </button>
-        <NavLink
-          to="/settings"
-          aria-label="설정"
-          className={({ isActive }) =>
-            `mt-auto rounded-lg p-2 text-lg leading-none transition-colors ${
-              isActive ? 'bg-sidebar-accent' : 'hover:bg-sidebar-accent'
-            }`
-          }
-        >
-          ⚙️
-        </NavLink>
+        <div className="mt-auto flex flex-col items-center gap-1">
+          <NavLink
+            to="/settings"
+            aria-label="설정"
+            className={({ isActive }) =>
+              `rounded-lg p-2 text-lg leading-none transition-colors ${
+                isActive ? 'bg-sidebar-accent' : 'hover:bg-sidebar-accent'
+              }`
+            }
+          >
+            ⚙️
+          </NavLink>
+          <QuickBackupButton />
+        </div>
       </div>
     )
   }
@@ -177,7 +220,7 @@ export function Sidebar() {
         <OtherTabList />
       </div>
 
-      <div className="px-4 pt-3">
+      <div className="flex items-center gap-1 px-4 pt-3">
         <NavLink
           to="/settings"
           aria-label="설정"
@@ -189,6 +232,7 @@ export function Sidebar() {
         >
           ⚙️
         </NavLink>
+        <QuickBackupButton />
       </div>
     </nav>
   )

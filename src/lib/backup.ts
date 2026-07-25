@@ -41,12 +41,17 @@ export function importBackupJson(json: string): void {
 
 export class BackupSyncError extends Error {}
 
+export interface BackupEntry {
+  id: string
+  updatedAt: number
+}
+
 function authHeaders(): Record<string, string> {
   const appAccessKey = useSettingsStore.getState().appAccessKey
   return appAccessKey ? { 'x-app-key': appAccessKey } : {}
 }
 
-/** Uploads the current backup JSON to the server. Returns the sync timestamp. */
+/** Uploads the current backup JSON to the server. The server keeps only the 3 most recent. */
 export async function uploadBackupToCloud(content: string): Promise<number> {
   const res = await fetch('/api/backup', {
     method: 'POST',
@@ -60,13 +65,30 @@ export async function uploadBackupToCloud(content: string): Promise<number> {
   return data.updatedAt as number
 }
 
-/** Downloads the backup JSON from the server. Returns null if no backup exists yet. */
-export async function downloadBackupFromCloud(): Promise<{ content: string; updatedAt: number } | null> {
+/** Lists the (up to 3) most recent backups, newest first. */
+export async function listCloudBackups(): Promise<BackupEntry[]> {
   const res = await fetch('/api/backup', { headers: authHeaders() })
+  const data = await res.json().catch(() => null)
+  if (!res.ok) {
+    throw new BackupSyncError(data?.error ?? `백업 목록 조회에 실패했습니다 (${res.status}).`)
+  }
+  return (data?.backups ?? []) as BackupEntry[]
+}
+
+/** Downloads one backup's JSON by id. Returns null if it no longer exists. */
+export async function downloadBackupFromCloud(id: string): Promise<{ content: string; updatedAt: number } | null> {
+  const res = await fetch(`/api/backup?id=${encodeURIComponent(id)}`, { headers: authHeaders() })
   if (res.status === 404) return null
   const data = await res.json().catch(() => null)
   if (!res.ok) {
     throw new BackupSyncError(data?.error ?? `백업 조회에 실패했습니다 (${res.status}).`)
   }
   return { content: data.content as string, updatedAt: data.updatedAt as number }
+}
+
+/** Exports current local data and uploads it. Shared by the Settings page and the sidebar quick-backup button. */
+export async function runQuickBackup(): Promise<number> {
+  const updatedAt = await uploadBackupToCloud(exportBackupJson())
+  useSettingsStore.getState().setLastSyncedAt(updatedAt)
+  return updatedAt
 }
