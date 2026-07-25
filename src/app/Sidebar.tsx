@@ -17,7 +17,7 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { CloudBackup, GripVertical, PanelLeftClose, PanelLeftOpen } from 'lucide-react'
+import { CloudBackup, GripVertical, Loader2, PanelLeftClose, PanelLeftOpen } from 'lucide-react'
 import { useOrderedTrainingTabs, useTabOrderStore } from '@/stores/useTabOrderStore'
 import { useOrderedOtherTabs, useOtherTabOrderStore } from '@/stores/useOtherTabOrderStore'
 import { useSidebarStore } from '@/stores/useSidebarStore'
@@ -157,9 +157,17 @@ function QuickBackupButton() {
         disabled={status === 'busy'}
         aria-label={label}
         title={label}
-        className="flex size-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+        className={`flex size-9 items-center justify-center rounded-lg transition-all active:scale-90 ${
+          status === 'busy'
+            ? 'bg-sidebar-accent text-sidebar-accent-foreground'
+            : 'text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
+        }`}
       >
-        <CloudBackup className="size-4" />
+        {status === 'busy' ? (
+          <Loader2 className="size-4 animate-spin" />
+        ) : (
+          <CloudBackup className="size-4" />
+        )}
       </button>
     </div>
   )
