@@ -29,8 +29,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         contentType: 'application/json',
       })
       res.status(200).json({ updatedAt: Date.now() })
-    } catch {
-      res.status(500).json({ error: '백업 저장에 실패했습니다.' })
+    } catch (e) {
+      console.error('backup upload failed', e)
+      res.status(500).json({ error: `백업 저장에 실패했습니다: ${e instanceof Error ? e.message : String(e)}` })
     }
     return
   }
@@ -50,8 +51,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
       const content = await fileRes.text()
       res.status(200).json({ content, updatedAt: new Date(blob.uploadedAt).getTime() })
-    } catch {
-      res.status(500).json({ error: '백업 조회에 실패했습니다.' })
+    } catch (e) {
+      console.error('backup download failed', e)
+      res.status(500).json({ error: `백업 조회에 실패했습니다: ${e instanceof Error ? e.message : String(e)}` })
     }
     return
   }
