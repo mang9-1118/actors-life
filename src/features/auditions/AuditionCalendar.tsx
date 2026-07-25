@@ -5,12 +5,20 @@ import 'react-calendar/dist/Calendar.css'
 import './calendar-theme.css'
 import { useAuditionStore } from '@/stores/useAuditionStore'
 import { useTimerStore } from '@/stores/useTimerStore'
-import { formatKoreanDate, toDateKey } from '@/lib/time'
+import { useOrderedTrainingTabs } from '@/stores/useTabOrderStore'
+import { useTabColors } from '@/stores/useTabColorStore'
+import { formatHoursMinutesKorean, formatKoreanDate, toDateKey } from '@/lib/time'
 import { DAILY_GOAL_SECONDS, TRAINING_TABS } from '@/types'
-import type { AuditionItem, DateKey } from '@/types'
+import type { AuditionItem, DateKey, TrainingTabId } from '@/types'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+
+interface DayBreakdownRow {
+  tabId: TrainingTabId
+  label: string
+  seconds: number
+}
 
 const TRAINING_TAB_IDS = TRAINING_TABS.map((tab) => tab.id)
 
@@ -34,7 +42,24 @@ export function AuditionCalendar() {
   const items = useAuditionStore((s) => s.items)
   const updateItem = useAuditionStore((s) => s.updateItem)
   const totals = useTimerStore((s) => s.totals)
+  const orderedTabs = useOrderedTrainingTabs()
+  const tabColors = useTabColors()
   const [selected, setSelected] = useState<string>(toDateKey(new Date()))
+
+  const dailyBreakdown = useMemo(() => {
+    const map = new Map<DateKey, DayBreakdownRow[]>()
+    for (const tab of orderedTabs) {
+      const tabTotals = totals[tab.id]
+      if (!tabTotals) continue
+      for (const [dateKey, seconds] of Object.entries(tabTotals)) {
+        if (!seconds) continue
+        const list = map.get(dateKey) ?? []
+        list.push({ tabId: tab.id, label: tab.label, seconds })
+        map.set(dateKey, list)
+      }
+    }
+    return map
+  }, [orderedTabs, totals])
 
   const goalAchievedDates = useMemo(() => {
     const dates = new Set<DateKey>()
@@ -78,15 +103,31 @@ export function AuditionCalendar() {
             const dateKey = toDateKey(date)
             const achievedGoal = goalAchievedDates.has(dateKey)
             const dayItems = itemsByDate.get(dateKey)
+            const dayBreakdown = dailyBreakdown.get(dateKey) ?? []
             const tagsPresent = new Set<DateTag>()
             if (dayItems) {
               for (const item of dayItems) {
                 for (const tag of tagsForItemOnDate(item, dateKey)) tagsPresent.add(tag)
               }
             }
-            if (!achievedGoal && tagsPresent.size === 0) return null
+            if (!achievedGoal && tagsPresent.size === 0 && dayBreakdown.length === 0) return null
             return (
               <>
+                {dayBreakdown.length > 0 && (
+                  <div className="app-calendar-tooltip">
+                    {dayBreakdown.map((row) => (
+                      <div key={row.tabId} className="flex items-center gap-1.5">
+                        <span
+                          className="inline-block size-1.5 shrink-0 rounded-full"
+                          style={{ backgroundColor: tabColors[row.tabId] }}
+                        />
+                        <span>
+                          {row.label} {formatHoursMinutesKorean(row.seconds)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
                 {achievedGoal && (
                   <div
                     className="pointer-events-none absolute inset-x-0 top-0 flex justify-center pt-[0.55em]"

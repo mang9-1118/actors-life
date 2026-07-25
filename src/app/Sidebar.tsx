@@ -135,29 +135,33 @@ function QuickBackupButton() {
     } catch {
       setStatus('error')
     } finally {
-      setTimeout(() => setStatus('idle'), 1500)
+      setTimeout(() => setStatus('idle'), 1800)
     }
   }
 
-  const label =
-    status === 'busy' ? '백업 중...' : status === 'done' ? '백업 완료' : status === 'error' ? '백업 실패' : '지금 백업'
+  const label = status === 'busy' ? '백업 중...' : '지금 백업'
 
   return (
-    <button
-      onClick={runBackup}
-      disabled={status === 'busy'}
-      aria-label={label}
-      title={label}
-      className={`flex size-9 items-center justify-center rounded-lg transition-colors ${
-        status === 'error'
-          ? 'text-destructive hover:bg-sidebar-accent'
-          : status === 'done'
-            ? 'text-primary hover:bg-sidebar-accent'
-            : 'text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
-      }`}
-    >
-      <CloudBackup className="size-4" />
-    </button>
+    <div className="relative flex items-center justify-center">
+      {(status === 'done' || status === 'error') && (
+        <span
+          className={`absolute bottom-full left-1/2 mb-1.5 -translate-x-1/2 whitespace-nowrap rounded-md border border-border bg-popover px-2 py-1 text-xs font-medium shadow-md ${
+            status === 'error' ? 'text-destructive' : 'text-primary'
+          }`}
+        >
+          {status === 'error' ? '백업 실패' : '백업되었습니다'}
+        </span>
+      )}
+      <button
+        onClick={runBackup}
+        disabled={status === 'busy'}
+        aria-label={label}
+        title={label}
+        className="flex size-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+      >
+        <CloudBackup className="size-4" />
+      </button>
+    </div>
   )
 }
 
@@ -220,7 +224,7 @@ export function Sidebar() {
         <OtherTabList />
       </div>
 
-      <div className="flex items-center gap-1 px-4 pt-3">
+      <div className="flex items-center justify-between px-4 pt-3">
         <NavLink
           to="/settings"
           aria-label="설정"
