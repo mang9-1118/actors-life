@@ -1,13 +1,17 @@
 import { useState } from 'react'
 import { useSettingsStore } from '@/stores/useSettingsStore'
 import { useTabColorStore, useTabColors } from '@/stores/useTabColorStore'
-import { DriveError, requestDriveAccessToken, syncDownload, syncUpload } from '@/lib/googleDrive'
-import { exportBackupJson, importBackupJson } from '@/lib/backup'
+import {
+  BackupSyncError,
+  downloadBackupFromCloud,
+  exportBackupJson,
+  importBackupJson,
+  uploadBackupToCloud,
+} from '@/lib/backup'
 import { TRAINING_TABS } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 
 export function Settings() {
   const appAccessKey = useSettingsStore((s) => s.appAccessKey)
@@ -21,65 +25,49 @@ export function Settings() {
     setTimeout(() => setSavedKey(false), 1500)
   }
 
-  const googleClientId = useSettingsStore((s) => s.googleClientId)
-  const setGoogleClientId = useSettingsStore((s) => s.setGoogleClientId)
-  const driveFileId = useSettingsStore((s) => s.driveFileId)
-  const setDriveFileId = useSettingsStore((s) => s.setDriveFileId)
   const lastSyncedAt = useSettingsStore((s) => s.lastSyncedAt)
   const setLastSyncedAt = useSettingsStore((s) => s.setLastSyncedAt)
 
-  const [draftClientId, setDraftClientId] = useState(googleClientId)
-  const [savedClientId, setSavedClientId] = useState(false)
-  const [driveBusy, setDriveBusy] = useState<'backup' | 'restore' | null>(null)
-  const [driveError, setDriveError] = useState('')
-  const [driveNotice, setDriveNotice] = useState('')
-
-  const saveClientId = () => {
-    setGoogleClientId(draftClientId.trim())
-    setSavedClientId(true)
-    setTimeout(() => setSavedClientId(false), 1500)
-  }
+  const [syncBusy, setSyncBusy] = useState<'backup' | 'restore' | null>(null)
+  const [syncError, setSyncError] = useState('')
+  const [syncNotice, setSyncNotice] = useState('')
 
   const backupNow = async () => {
-    setDriveBusy('backup')
-    setDriveError('')
-    setDriveNotice('')
+    setSyncBusy('backup')
+    setSyncError('')
+    setSyncNotice('')
     try {
-      const accessToken = await requestDriveAccessToken(googleClientId)
       const content = exportBackupJson()
-      const fileId = await syncUpload(accessToken, driveFileId, content)
-      setDriveFileId(fileId)
-      setLastSyncedAt(Date.now())
-      setDriveNotice('Drive에 백업이 저장되었습니다.')
+      const updatedAt = await uploadBackupToCloud(content)
+      setLastSyncedAt(updatedAt)
+      setSyncNotice('백업이 저장되었습니다.')
     } catch (e) {
-      setDriveError(e instanceof DriveError ? e.message : 'Drive 백업 중 오류가 발생했습니다.')
+      setSyncError(e instanceof BackupSyncError ? e.message : '백업 중 오류가 발생했습니다.')
     } finally {
-      setDriveBusy(null)
+      setSyncBusy(null)
     }
   }
 
-  const restoreFromDrive = async () => {
-    if (!window.confirm('Drive의 백업으로 복원하면 현재 기기에 저장된 데이터를 덮어씁니다. 계속할까요?')) {
+  const restoreFromCloud = async () => {
+    if (!window.confirm('저장된 백업으로 복원하면 현재 기기에 저장된 데이터를 덮어씁니다. 계속할까요?')) {
       return
     }
-    setDriveBusy('restore')
-    setDriveError('')
-    setDriveNotice('')
+    setSyncBusy('restore')
+    setSyncError('')
+    setSyncNotice('')
     try {
-      const accessToken = await requestDriveAccessToken(googleClientId)
-      const result = await syncDownload(accessToken, driveFileId)
+      const result = await downloadBackupFromCloud()
       if (!result) {
-        setDriveError('Drive에 저장된 백업이 아직 없습니다.')
+        setSyncError('저장된 백업이 아직 없습니다.')
         return
       }
       importBackupJson(result.content)
-      setDriveFileId(result.fileId)
-      setLastSyncedAt(Date.now())
+      setLastSyncedAt(result.updatedAt)
       window.location.reload()
     } catch (e) {
-      setDriveError(e instanceof DriveError ? e.message : 'Drive 복원 중 오류가 발생했습니다.')
+      setSyncError(e instanceof BackupSyncError ? e.message : '복원 중 오류가 발생했습니다.')
     } finally {
-      setDriveBusy(null)
+      setSyncBusy(null)
     }
   }
 
@@ -147,48 +135,26 @@ export function Settings() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">Google Drive 동기화</CardTitle>
+          <CardTitle className="text-lg">데이터 백업</CardTitle>
         </CardHeader>
         <CardContent className="flex flex-col gap-3">
           <p className="text-sm text-muted-foreground">
-            Google Cloud 콘솔에서 Drive API를 사용 설정하고, OAuth 2.0 클라이언트 ID(웹 애플리케이션)를
-            만든 뒤 승인된 자바스크립트 원본에 이 앱 주소(예: http://localhost:5173)를 추가하세요.
-            발급받은 클라이언트 ID를 아래에 입력하면, 앱 데이터를 본인 Drive에 백업/복원할 수 있습니다.
-            데이터는 <span className="font-medium text-foreground">이 앱이 만든 파일에만</span> 접근하는
-            권한(drive.file)만 사용합니다.
+            위의 접근키(APP_ACCESS_KEY)를 저장해두면, 다른 기기에서도 같은 값을 입력하는 것만으로
+            데이터를 백업하고 불러올 수 있습니다. 별도의 Google 로그인이나 API 키 발급 과정이
+            필요하지 않습니다.
           </p>
 
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="google-client-id">Google OAuth 클라이언트 ID</Label>
-            <div className="flex gap-2">
-              <Input
-                id="google-client-id"
-                value={draftClientId}
-                onChange={(e) => setDraftClientId(e.target.value)}
-                placeholder="xxxxxxxxxxxx.apps.googleusercontent.com"
-                className="flex-1"
-              />
-              <Button variant="outline" onClick={saveClientId}>
-                {savedClientId ? '저장됨' : '저장'}
-              </Button>
-            </div>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2 pt-1">
-            <Button onClick={backupNow} disabled={!googleClientId || driveBusy != null}>
-              {driveBusy === 'backup' ? '백업 중...' : '지금 백업'}
+          <div className="flex flex-wrap items-center gap-2">
+            <Button onClick={backupNow} disabled={syncBusy != null}>
+              {syncBusy === 'backup' ? '백업 중...' : '지금 백업'}
             </Button>
-            <Button
-              variant="outline"
-              onClick={restoreFromDrive}
-              disabled={!googleClientId || driveBusy != null}
-            >
-              {driveBusy === 'restore' ? '복원 중...' : 'Drive에서 복원'}
+            <Button variant="outline" onClick={restoreFromCloud} disabled={syncBusy != null}>
+              {syncBusy === 'restore' ? '복원 중...' : '백업에서 복원'}
             </Button>
           </div>
 
-          {driveError && <p className="text-sm text-destructive">{driveError}</p>}
-          {driveNotice && !driveError && <p className="text-sm text-foreground">{driveNotice}</p>}
+          {syncError && <p className="text-sm text-destructive">{syncError}</p>}
+          {syncNotice && !syncError && <p className="text-sm text-foreground">{syncNotice}</p>}
           {lastSyncedAt != null && (
             <p className="text-xs text-muted-foreground">
               마지막 동기화: {new Date(lastSyncedAt).toLocaleString('ko-KR')}
