@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { list, put } from '@vercel/blob'
+import { get, put } from '@vercel/blob'
 
 const BACKUP_PATHNAME = 'actors-life-backup.json'
 
@@ -23,7 +23,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
     try {
       await put(BACKUP_PATHNAME, body.content, {
-        access: 'public',
+        access: 'private',
         addRandomSuffix: false,
         allowOverwrite: true,
         contentType: 'application/json',
@@ -38,19 +38,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   if (req.method === 'GET') {
     try {
-      const { blobs } = await list({ prefix: BACKUP_PATHNAME, limit: 1 })
-      const blob = blobs.find((b) => b.pathname === BACKUP_PATHNAME)
-      if (!blob) {
+      const result = await get(BACKUP_PATHNAME, { access: 'private' })
+      if (!result) {
         res.status(404).json({ error: '저장된 백업이 아직 없습니다.' })
         return
       }
-      const fileRes = await fetch(blob.url)
-      if (!fileRes.ok) {
-        res.status(502).json({ error: '백업 파일을 불러오지 못했습니다.' })
+      if (result.statusCode !== 200 || !result.stream) {
+        res.status(404).json({ error: '저장된 백업이 아직 없습니다.' })
         return
       }
-      const content = await fileRes.text()
-      res.status(200).json({ content, updatedAt: new Date(blob.uploadedAt).getTime() })
+      const content = await new Response(result.stream).text()
+      res.status(200).json({ content, updatedAt: new Date(result.blob.uploadedAt).getTime() })
     } catch (e) {
       console.error('backup download failed', e)
       res.status(500).json({ error: `백업 조회에 실패했습니다: ${e instanceof Error ? e.message : String(e)}` })
