@@ -11,17 +11,6 @@ export function toDateKey(date: Date): DateKey {
   return `${y}-${m}-${d}`
 }
 
-export function lastNDateKeys(n: number): DateKey[] {
-  const keys: DateKey[] = []
-  const now = new Date()
-  for (let i = n - 1; i >= 0; i--) {
-    const d = new Date(now)
-    d.setDate(now.getDate() - i)
-    keys.push(toDateKey(d))
-  }
-  return keys
-}
-
 export function addDays(date: Date, days: number): Date {
   const d = new Date(date)
   d.setDate(d.getDate() + days)
@@ -54,6 +43,13 @@ export function currentYearMonthKey(): string {
 export function formatKoreanDate(dateKey: DateKey): string {
   const [, m, d] = dateKey.split('-')
   return `${Number(m)}/${Number(d)}`
+}
+
+/** Newest first: by date descending, ties broken by creation time. */
+export function sortByDateDesc<T extends { date: DateKey; createdAt: number }>(entries: T[]): T[] {
+  return entries
+    .slice()
+    .sort((a, b) => b.date.localeCompare(a.date) || b.createdAt - a.createdAt)
 }
 
 export function formatDuration(totalSeconds: number): string {

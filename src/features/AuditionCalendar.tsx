@@ -5,22 +5,27 @@ import 'react-calendar/dist/Calendar.css'
 import './calendar-theme.css'
 import { useAuditionStore } from '@/stores/useAuditionStore'
 import { useTimerStore } from '@/stores/useTimerStore'
-import { useOrderedTrainingTabs } from '@/stores/useTabOrderStore'
+import { useOrderedTrainingTabs } from '@/stores/tabOrder'
 import { useTabColors } from '@/stores/useTabColorStore'
-import { formatHoursMinutesKorean, formatKoreanDate, toDateKey } from '@/lib/time'
-import { DAILY_GOAL_SECONDS, TRAINING_TABS } from '@/types'
+import {
+  currentYearMonthKey,
+  formatHoursMinutesKorean,
+  formatKoreanDate,
+  toDateKey,
+  yearMonthKey,
+} from '@/lib/time'
+import { DAILY_GOAL_SECONDS, TRAINING_TAB_IDS } from '@/types'
 import type { AuditionItem, DateKey, TrainingTabId } from '@/types'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { StatCard } from '@/components/common'
 
 interface DayBreakdownRow {
   tabId: TrainingTabId
   label: string
   seconds: number
 }
-
-const TRAINING_TAB_IDS = TRAINING_TABS.map((tab) => tab.id)
 
 type DateTag = 'deadline' | 'announce' | 'audition'
 
@@ -38,7 +43,30 @@ function tagsForItemOnDate(item: AuditionItem, dateKey: DateKey): DateTag[] {
   return tags
 }
 
-export function AuditionCalendar() {
+export function AuditionCalendarPage() {
+  const items = useAuditionStore((s) => s.items)
+
+  const monthlyCount = useMemo(() => {
+    const thisMonth = currentYearMonthKey()
+    return items.filter((item) => yearMonthKey(toDateKey(new Date(item.createdAt))) === thisMonth)
+      .length
+  }, [items])
+
+  return (
+    <div className="flex flex-col gap-6">
+      <h1 className="text-2xl font-heading font-semibold text-foreground">오디션 캘린더</h1>
+
+      <div className="grid grid-cols-2 gap-4">
+        <StatCard label="지금까지 지원한 오디션" value={`${items.length}건`} />
+        <StatCard label="이번 달 지원한 오디션" value={`${monthlyCount}건`} />
+      </div>
+
+      <AuditionCalendar />
+    </div>
+  )
+}
+
+function AuditionCalendar() {
   const items = useAuditionStore((s) => s.items)
   const updateItem = useAuditionStore((s) => s.updateItem)
   const totals = useTimerStore((s) => s.totals)

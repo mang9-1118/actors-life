@@ -9,8 +9,6 @@ interface TimerState {
   totals: Partial<Record<string, Partial<Record<DateKey, number>>>>
   start: (key: string) => void
   stop: (key: string) => void
-  isRunning: (key: string) => boolean
-  getStartTimestamp: (key: string) => number | null
   getCommittedSeconds: (key: string, date?: DateKey) => number
   setCommittedSeconds: (key: string, date: DateKey, seconds: number) => void
 }
@@ -42,10 +40,6 @@ export const useTimerStore = create<TimerState>()(
           }
         })
       },
-
-      isRunning: (key) => get().running[key] != null,
-
-      getStartTimestamp: (key) => get().running[key] ?? null,
 
       getCommittedSeconds: (key, date = todayKey()) =>
         get().totals[key]?.[date] ?? 0,

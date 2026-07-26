@@ -3,25 +3,14 @@ import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Checkbox } from '@/components/ui/checkbox'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { StackedBar } from '@/components/StackedBar'
+import { DurationDialog, StackedBar } from '@/components/common'
 import { useTodoStore } from '@/stores/useTodoStore'
 import { useLiveSecondsMap, useTimerStore } from '@/stores/useTimerStore'
-import { useOrderedTrainingTabs } from '@/stores/useTabOrderStore'
+import { useOrderedTrainingTabs } from '@/stores/tabOrder'
 import { useTabColors } from '@/stores/useTabColorStore'
-import { DAILY_GOAL_SECONDS, TRAINING_TABS } from '@/types'
+import { DAILY_GOAL_SECONDS, TRAINING_TAB_IDS } from '@/types'
 import { addDays, formatDuration, formatKoreanDate, toDateKey } from '@/lib/time'
-
-const TRAINING_TAB_IDS = TRAINING_TABS.map((tab) => tab.id)
 
 function TodoChecklist() {
   const { items, addItem, toggleItem, removeItem } = useTodoStore()
@@ -53,11 +42,12 @@ function TodoChecklist() {
         <ul className="flex flex-col gap-2">
           {items.map((item) => (
             <li key={item.id} className="flex items-center gap-3 rounded-lg bg-muted px-3 py-2">
-              <Checkbox
-                checked={item.done}
-                onCheckedChange={() => toggleItem(item.id)}
-              />
-              <span className={`flex-1 text-sm ${item.done ? 'text-muted-foreground line-through' : 'text-foreground'}`}>
+              <Checkbox checked={item.done} onCheckedChange={() => toggleItem(item.id)} />
+              <span
+                className={`flex-1 text-sm ${
+                  item.done ? 'text-muted-foreground line-through' : 'text-foreground'
+                }`}
+              >
                 {item.text}
               </span>
               <button
@@ -68,9 +58,7 @@ function TodoChecklist() {
               </button>
             </li>
           ))}
-          {items.length === 0 && (
-            <li className="text-sm text-muted-foreground">할 일이 없습니다.</li>
-          )}
+          {items.length === 0 && <li className="text-sm text-muted-foreground">할 일이 없습니다.</li>}
         </ul>
       </CardContent>
     </Card>
@@ -93,23 +81,6 @@ function DailyGoalGauge() {
   const overallPct = Math.min(100, (totalSeconds / DAILY_GOAL_SECONDS) * 100)
 
   const [editingTab, setEditingTab] = useState<{ id: string; label: string } | null>(null)
-  const [draftHours, setDraftHours] = useState('0')
-  const [draftMinutes, setDraftMinutes] = useState('0')
-
-  const openEdit = (id: string, label: string) => {
-    const seconds = secondsByTab[id] ?? 0
-    setDraftHours(String(Math.floor(seconds / 3600)))
-    setDraftMinutes(String(Math.floor((seconds % 3600) / 60)))
-    setEditingTab({ id, label })
-  }
-
-  const saveEdit = () => {
-    if (!editingTab) return
-    const hours = Math.max(0, Number(draftHours) || 0)
-    const minutes = Math.max(0, Number(draftMinutes) || 0)
-    setCommittedSeconds(editingTab.id, selectedDateKey, hours * 3600 + minutes * 60)
-    setEditingTab(null)
-  }
 
   return (
     <Card>
@@ -142,7 +113,8 @@ function DailyGoalGauge() {
           <div className="flex items-baseline justify-between text-sm">
             <span className="text-muted-foreground">전체 달성률</span>
             <span className="font-mono text-lg font-semibold text-foreground">
-              {formatDuration(totalSeconds)} / {formatDuration(DAILY_GOAL_SECONDS)} ({overallPct.toFixed(1)}%)
+              {formatDuration(totalSeconds)} / {formatDuration(DAILY_GOAL_SECONDS)} (
+              {overallPct.toFixed(1)}%)
             </span>
           </div>
           <StackedBar
@@ -160,6 +132,7 @@ function DailyGoalGauge() {
           {orderedTabs.map((tab) => {
             const seconds = secondsByTab[tab.id] ?? 0
             const pct = (seconds / DAILY_GOAL_SECONDS) * 100
+            const timeText = `${formatDuration(seconds)} (${pct.toFixed(1)}%)`
             return (
               <div key={tab.id} className="flex items-center gap-3 text-sm">
                 <span className="flex w-24 shrink-0 items-center gap-2 text-foreground">
@@ -170,17 +143,15 @@ function DailyGoalGauge() {
                   {tab.label}
                 </span>
                 {isToday ? (
-                  <span className="font-mono text-muted-foreground">
-                    {formatDuration(seconds)} ({pct.toFixed(1)}%)
-                  </span>
+                  <span className="font-mono text-muted-foreground">{timeText}</span>
                 ) : (
                   <button
                     type="button"
                     aria-label={`${tab.label} 기록 시간 수정`}
-                    onClick={() => openEdit(tab.id, tab.label)}
+                    onClick={() => setEditingTab({ id: tab.id, label: tab.label })}
                     className="cursor-pointer rounded-sm font-mono text-muted-foreground underline-offset-4 transition-colors hover:font-semibold hover:text-foreground hover:underline focus-visible:font-semibold focus-visible:text-foreground focus-visible:underline focus-visible:outline-none"
                   >
-                    {formatDuration(seconds)} ({pct.toFixed(1)}%)
+                    {timeText}
                   </button>
                 )}
               </div>
@@ -189,49 +160,17 @@ function DailyGoalGauge() {
         </div>
       </CardContent>
 
-      <Dialog open={editingTab != null} onOpenChange={(open) => !open && setEditingTab(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>
-              {formatKoreanDate(selectedDateKey)} · {editingTab?.label} 기록 시간 수정
-            </DialogTitle>
-            <DialogDescription>
-              기록을 깜빡했거나 잘못 기록한 날의 누적 시간을 직접 입력해 바로잡을 수 있습니다.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="flex items-end gap-2">
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="dashboard-edit-hours">시간</Label>
-              <Input
-                id="dashboard-edit-hours"
-                type="number"
-                min={0}
-                value={draftHours}
-                onChange={(e) => setDraftHours(e.target.value)}
-                className="w-20"
-              />
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="dashboard-edit-minutes">분</Label>
-              <Input
-                id="dashboard-edit-minutes"
-                type="number"
-                min={0}
-                max={59}
-                value={draftMinutes}
-                onChange={(e) => setDraftMinutes(e.target.value)}
-                className="w-20"
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setEditingTab(null)}>
-              취소
-            </Button>
-            <Button onClick={saveEdit}>저장</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <DurationDialog
+        open={editingTab != null}
+        onOpenChange={(open) => !open && setEditingTab(null)}
+        title={`${formatKoreanDate(selectedDateKey)} · ${editingTab?.label} 기록 시간 수정`}
+        description="기록을 깜빡했거나 잘못 기록한 날의 누적 시간을 직접 입력해 바로잡을 수 있습니다."
+        idPrefix="dashboard-edit"
+        seconds={editingTab ? (secondsByTab[editingTab.id] ?? 0) : 0}
+        onSave={(seconds) => {
+          if (editingTab) setCommittedSeconds(editingTab.id, selectedDateKey, seconds)
+        }}
+      />
     </Card>
   )
 }

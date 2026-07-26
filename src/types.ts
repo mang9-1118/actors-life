@@ -21,6 +21,8 @@ export const TRAINING_TABS: TrainingTabMeta[] = [
   { id: 'analysis2', label: '2차적 분석', path: 'analysis2' },
 ]
 
+export const TRAINING_TAB_IDS: TrainingTabId[] = TRAINING_TABS.map((tab) => tab.id)
+
 export type OtherTabId =
   | 'media-log'
   | 'reading-log'

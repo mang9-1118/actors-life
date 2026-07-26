@@ -18,10 +18,25 @@ import {
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { CloudBackup, GripVertical, Loader2, PanelLeftClose, PanelLeftOpen } from 'lucide-react'
-import { useOrderedTrainingTabs, useTabOrderStore } from '@/stores/useTabOrderStore'
-import { useOrderedOtherTabs, useOtherTabOrderStore } from '@/stores/useOtherTabOrderStore'
-import { useSidebarStore } from '@/stores/useSidebarStore'
+import { create } from 'zustand'
+import { persist } from 'zustand/middleware'
+import {
+  useOrderedOtherTabs,
+  useOrderedTrainingTabs,
+  useOtherTabOrderStore,
+  useTabOrderStore,
+} from '@/stores/tabOrder'
 import { runQuickBackup } from '@/lib/backup'
+
+const useSidebarStore = create<{ collapsed: boolean; toggle: () => void }>()(
+  persist(
+    (set) => ({
+      collapsed: false,
+      toggle: () => set((state) => ({ collapsed: !state.collapsed })),
+    }),
+    { name: 'sidebar-store' },
+  ),
+)
 
 const linkClass = ({ isActive }: { isActive: boolean }) =>
   `block rounded-lg px-4 py-2 text-sm transition-colors ${
@@ -65,12 +80,12 @@ function SortableNavItem({ item }: { item: SortableItem }) {
   )
 }
 
-function SortableNavList({
+function SortableNavList<Id extends string>({
   items,
   onReorder,
 }: {
-  items: SortableItem[]
-  onReorder: (ids: string[]) => void
+  items: { id: Id; label: string; to: string }[]
+  onReorder: (ids: Id[]) => void
 }) {
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
@@ -81,8 +96,8 @@ function SortableNavList({
     const { active, over } = event
     if (!over || active.id === over.id) return
     const ids = items.map((item) => item.id)
-    const oldIndex = ids.indexOf(active.id as string)
-    const newIndex = ids.indexOf(over.id as string)
+    const oldIndex = ids.indexOf(active.id as Id)
+    const newIndex = ids.indexOf(over.id as Id)
     onReorder(arrayMove(ids, oldIndex, newIndex))
   }
 
@@ -94,32 +109,6 @@ function SortableNavList({
         ))}
       </SortableContext>
     </DndContext>
-  )
-}
-
-function TrainingTabList() {
-  const orderedTabs = useOrderedTrainingTabs()
-  const setOrder = useTabOrderStore((s) => s.setOrder)
-  const items = orderedTabs.map((tab) => ({ id: tab.id, label: tab.label, to: `/train/${tab.path}` }))
-
-  return (
-    <SortableNavList
-      items={items}
-      onReorder={(ids) => setOrder(ids as typeof orderedTabs[number]['id'][])}
-    />
-  )
-}
-
-function OtherTabList() {
-  const orderedTabs = useOrderedOtherTabs()
-  const setOrder = useOtherTabOrderStore((s) => s.setOrder)
-  const items = orderedTabs.map((tab) => ({ id: tab.id, label: tab.label, to: tab.path }))
-
-  return (
-    <SortableNavList
-      items={items}
-      onReorder={(ids) => setOrder(ids as typeof orderedTabs[number]['id'][])}
-    />
   )
 }
 
@@ -176,6 +165,10 @@ function QuickBackupButton() {
 export function Sidebar() {
   const collapsed = useSidebarStore((s) => s.collapsed)
   const toggle = useSidebarStore((s) => s.toggle)
+  const trainingTabs = useOrderedTrainingTabs()
+  const otherTabs = useOrderedOtherTabs()
+  const setTrainingOrder = useTabOrderStore((s) => s.setOrder)
+  const setOtherOrder = useOtherTabOrderStore((s) => s.setOrder)
 
   if (collapsed) {
     return (
@@ -226,10 +219,20 @@ export function Sidebar() {
         </NavLink>
 
         <div className={sectionLabelClass}>집중 시간 트래커</div>
-        <TrainingTabList />
+        <SortableNavList
+          items={trainingTabs.map((tab) => ({
+            id: tab.id,
+            label: tab.label,
+            to: `/train/${tab.path}`,
+          }))}
+          onReorder={setTrainingOrder}
+        />
 
         <div className={sectionLabelClass}>기타</div>
-        <OtherTabList />
+        <SortableNavList
+          items={otherTabs.map((tab) => ({ id: tab.id, label: tab.label, to: tab.path }))}
+          onReorder={setOtherOrder}
+        />
       </div>
 
       <div className="flex items-center justify-between px-4 pt-3">

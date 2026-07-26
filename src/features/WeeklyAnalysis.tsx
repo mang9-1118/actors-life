@@ -1,19 +1,10 @@
 import { useMemo, useState } from 'react'
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, XAxis, YAxis } from 'recharts'
-import { Settings } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
-import { Textarea } from '@/components/ui/textarea'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { PromptSetting, StatCard } from '@/components/common'
 import { useTimerStore } from '@/stores/useTimerStore'
 import { useAuditionStore } from '@/stores/useAuditionStore'
 import { useAnalysisStore } from '@/stores/useAnalysisStore'
@@ -27,14 +18,12 @@ import {
   toDateKey,
   weekDateKeys,
 } from '@/lib/time'
-import { useOrderedTrainingTabs } from '@/stores/useTabOrderStore'
+import { useOrderedTrainingTabs } from '@/stores/tabOrder'
 import { useTabColors } from '@/stores/useTabColorStore'
 import { DAILY_GOAL_SECONDS } from '@/types'
 import type { TrainingTabId } from '@/types'
 
-function CategoryBarShape(
-  props: any & { tabColors: Record<TrainingTabId, string> },
-) {
+function CategoryBarShape(props: any & { tabColors: Record<TrainingTabId, string> }) {
   const { x, y, width, height, payload, tabColors } = props
   const color = tabColors[payload.tabId as TrainingTabId]
   const text = formatHoursMinutesKorean(payload.seconds)
@@ -70,8 +59,6 @@ export function WeeklyAnalysis() {
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()))
   const [loadingComment, setLoadingComment] = useState(false)
   const [commentError, setCommentError] = useState('')
-  const [promptDialogOpen, setPromptDialogOpen] = useState(false)
-  const [draftPrompt, setDraftPrompt] = useState('')
   const [draftGoalHours, setDraftGoalHours] = useState<Partial<Record<TrainingTabId, number>>>({})
 
   const weekKey = toDateKey(weekStart)
@@ -101,10 +88,7 @@ export function WeeklyAnalysis() {
 
   const avgSeconds = daysElapsedInWeek > 0 ? totalSeconds / daysElapsedInWeek : 0
 
-  const previousWeekDateKeys = useMemo(
-    () => weekDateKeys(addDays(weekStart, -7)),
-    [weekStart],
-  )
+  const previousWeekDateKeys = useMemo(() => weekDateKeys(addDays(weekStart, -7)), [weekStart])
   const previousHoursByTab = useMemo(() => {
     const map: Partial<Record<TrainingTabId, number>> = {}
     for (const tab of orderedTabs) {
@@ -139,10 +123,7 @@ export function WeeklyAnalysis() {
     const maxHours = Math.max(...data.map((row) => row.hours), 0)
     return Math.max(1, Math.ceil(maxHours))
   }, [data])
-  const yAxisTicks = useMemo(
-    () => Array.from({ length: yAxisMax + 1 }, (_, i) => i),
-    [yAxisMax],
-  )
+  const yAxisTicks = useMemo(() => Array.from({ length: yAxisMax + 1 }, (_, i) => i), [yAxisMax])
 
   const auditionCount = useMemo(() => {
     const dateKeySet = new Set(dateKeys)
@@ -171,7 +152,9 @@ export function WeeklyAnalysis() {
       })
       setWeeklyComment(weekKey, comment)
     } catch (e) {
-      setCommentError(e instanceof GeminiError ? e.message : 'AI 코멘트 생성 중 오류가 발생했습니다.')
+      setCommentError(
+        e instanceof GeminiError ? e.message : 'AI 코멘트 생성 중 오류가 발생했습니다.',
+      )
     } finally {
       setLoadingComment(false)
     }
@@ -182,22 +165,16 @@ export function WeeklyAnalysis() {
       <h1 className="text-2xl font-heading font-semibold text-foreground">주간 분석</h1>
 
       <div className="grid grid-cols-2 gap-4">
-        <Card>
-          <CardContent>
-            <div className="text-sm text-muted-foreground">선택한 주 총 훈련 시간</div>
-            <div className="mt-2 text-3xl font-semibold text-amber-600">
-              {formatHoursMinutesFixed(totalSeconds)}
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent>
-            <div className="text-sm text-muted-foreground">일 평균 훈련 시간</div>
-            <div className="mt-2 text-3xl font-semibold text-sky-600">
-              {formatHoursMinutesFixed(avgSeconds)}
-            </div>
-          </CardContent>
-        </Card>
+        <StatCard
+          label="선택한 주 총 훈련 시간"
+          value={formatHoursMinutesFixed(totalSeconds)}
+          valueClassName="text-amber-600"
+        />
+        <StatCard
+          label="일 평균 훈련 시간"
+          value={formatHoursMinutesFixed(avgSeconds)}
+          valueClassName="text-sky-600"
+        />
       </div>
 
       <Card>
@@ -232,7 +209,8 @@ export function WeeklyAnalysis() {
             </BarChart>
           </ResponsiveContainer>
           <p className="mt-4 text-sm text-muted-foreground">
-            이번 주 지원한 오디션: <span className="font-medium text-foreground">{auditionCount}건</span>
+            이번 주 지원한 오디션:{' '}
+            <span className="font-medium text-foreground">{auditionCount}건</span>
           </p>
         </CardContent>
       </Card>
@@ -241,18 +219,42 @@ export function WeeklyAnalysis() {
         <CardHeader className="flex flex-row items-center justify-between">
           <div className="flex items-center gap-1.5">
             <CardTitle className="text-lg">AI 개인화 코멘트</CardTitle>
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              aria-label="AI 코멘트 기준 설정"
-              onClick={() => {
-                setDraftPrompt(weeklyCommentPrompt)
-                setDraftGoalHours(weeklyGoalHours)
-                setPromptDialogOpen(true)
+            <PromptSetting
+              title="AI 코멘트 기준 설정"
+              description="AI가 주간 코멘트를 작성할 때 참고할 기준이나 강조하고 싶은 내용을 입력하세요."
+              placeholder="예: 발성 연습량이 부족하면 반드시 지적해줘. 항상 다정한 말투로 작성해줘."
+              value={weeklyCommentPrompt}
+              onOpen={() => setDraftGoalHours(weeklyGoalHours)}
+              onSave={(prompt) => {
+                setWeeklyCommentPrompt(prompt)
+                setWeeklyGoalHours(draftGoalHours)
               }}
             >
-              <Settings />
-            </Button>
+              <div className="flex flex-col gap-1.5">
+                <Label>카테고리별 주간 목표 시간 (시간)</Label>
+                <div className="grid grid-cols-2 gap-2">
+                  {orderedTabs.map((tab) => (
+                    <div key={tab.id} className="flex items-center justify-between gap-2">
+                      <span className="text-sm text-muted-foreground">{tab.label}</span>
+                      <Input
+                        type="number"
+                        min={0}
+                        step={0.5}
+                        value={draftGoalHours[tab.id] ?? ''}
+                        onChange={(e) =>
+                          setDraftGoalHours((prev) => ({
+                            ...prev,
+                            [tab.id]: e.target.value === '' ? undefined : Number(e.target.value),
+                          }))
+                        }
+                        placeholder="미설정"
+                        className="w-20"
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </PromptSetting>
           </div>
           <Button variant="outline" size="sm" onClick={generateComment} disabled={loadingComment}>
             {loadingComment ? '생성 중...' : weeklyComments[weekKey] ? '다시 생성' : '코멘트 생성'}
@@ -267,61 +269,6 @@ export function WeeklyAnalysis() {
           )}
         </CardContent>
       </Card>
-
-      <Dialog open={promptDialogOpen} onOpenChange={setPromptDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>AI 코멘트 기준 설정</DialogTitle>
-            <DialogDescription>
-              AI가 주간 코멘트를 작성할 때 참고할 기준이나 강조하고 싶은 내용을 입력하세요.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="flex flex-col gap-1.5">
-            <Label>카테고리별 주간 목표 시간 (시간)</Label>
-            <div className="grid grid-cols-2 gap-2">
-              {orderedTabs.map((tab) => (
-                <div key={tab.id} className="flex items-center justify-between gap-2">
-                  <span className="text-sm text-muted-foreground">{tab.label}</span>
-                  <Input
-                    type="number"
-                    min={0}
-                    step={0.5}
-                    value={draftGoalHours[tab.id] ?? ''}
-                    onChange={(e) =>
-                      setDraftGoalHours((prev) => ({
-                        ...prev,
-                        [tab.id]: e.target.value === '' ? undefined : Number(e.target.value),
-                      }))
-                    }
-                    placeholder="미설정"
-                    className="w-20"
-                  />
-                </div>
-              ))}
-            </div>
-          </div>
-          <Textarea
-            value={draftPrompt}
-            onChange={(e) => setDraftPrompt(e.target.value)}
-            placeholder="예: 발성 연습량이 부족하면 반드시 지적해줘. 항상 다정한 말투로 작성해줘."
-            className="min-h-32"
-          />
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setPromptDialogOpen(false)}>
-              취소
-            </Button>
-            <Button
-              onClick={() => {
-                setWeeklyCommentPrompt(draftPrompt)
-                setWeeklyGoalHours(draftGoalHours)
-                setPromptDialogOpen(false)
-              }}
-            >
-              저장
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   )
 }

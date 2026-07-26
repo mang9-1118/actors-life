@@ -1,14 +1,13 @@
 import { useMemo, useState } from 'react'
-import { useMediaLogStore } from '@/stores/useMediaLogStore'
-import { currentYearMonthKey, formatKoreanDate, todayKey, yearMonthKey } from '@/lib/time'
+import { useMediaLogStore } from '@/stores/entryStores'
+import { currentYearMonthKey, formatKoreanDate, sortByDateDesc, todayKey, yearMonthKey } from '@/lib/time'
 import type { MediaLogEntry, MediaType } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
+import { Field, RecordCard, StatCard, TextField } from '@/components/common'
 
 const MEDIA_TYPE_LABEL: Record<MediaType, string> = {
   movie: '영화',
@@ -68,9 +67,7 @@ export function MediaLog() {
     resetForm()
   }
 
-  const sortedEntries = entries
-    .slice()
-    .sort((a, b) => b.date.localeCompare(a.date) || b.createdAt - a.createdAt)
+  const sortedEntries = sortByDateDesc(entries)
 
   const monthlyCounts = useMemo(() => {
     const thisMonth = currentYearMonthKey()
@@ -89,22 +86,8 @@ export function MediaLog() {
       <h1 className="text-2xl font-heading font-semibold text-foreground">드라마/영화 시청</h1>
 
       <div className="grid grid-cols-2 gap-4">
-        <Card>
-          <CardContent>
-            <div className="text-sm text-muted-foreground">이번 달 시청한 영화</div>
-            <div className="mt-2 text-3xl font-semibold text-foreground">
-              {monthlyCounts.movies}편
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent>
-            <div className="text-sm text-muted-foreground">이번 달 시청한 드라마</div>
-            <div className="mt-2 text-3xl font-semibold text-foreground">
-              {monthlyCounts.dramas}편
-            </div>
-          </CardContent>
-        </Card>
+        <StatCard label="이번 달 시청한 영화" value={`${monthlyCounts.movies}편`} />
+        <StatCard label="이번 달 시청한 드라마" value={`${monthlyCounts.dramas}편`} />
       </div>
 
       <Card>
@@ -112,8 +95,7 @@ export function MediaLog() {
           <CardTitle className="text-lg">{editingId ? '기록 수정' : '새 기록 추가'}</CardTitle>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
-          <div className="flex flex-col gap-1.5">
-            <Label>구분</Label>
+          <Field label="구분">
             <RadioGroup
               value={mediaType}
               onValueChange={(v) => setMediaType(v as MediaType)}
@@ -126,55 +108,38 @@ export function MediaLog() {
                 <RadioGroupItem value="drama" /> 드라마
               </label>
             </RadioGroup>
-          </div>
+          </Field>
 
           <div className="grid grid-cols-2 gap-3">
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="media-date">날짜</Label>
-              <Input id="media-date" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="media-title">제목</Label>
-              <Input
-                id="media-title"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder="작품 제목"
-              />
-            </div>
+            <TextField label="날짜" id="media-date" type="date" value={date} onChange={setDate} />
+            <TextField
+              label="제목"
+              id="media-title"
+              value={title}
+              onChange={setTitle}
+              placeholder="작품 제목"
+            />
             {mediaType === 'drama' && (
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="media-episode">몇 화</Label>
-                <Input
-                  id="media-episode"
-                  type="number"
-                  min={1}
-                  value={episode}
-                  onChange={(e) => setEpisode(e.target.value)}
-                  placeholder="예: 12"
-                />
-              </div>
+              <TextField
+                label="몇 화"
+                id="media-episode"
+                type="number"
+                min={1}
+                value={episode}
+                onChange={setEpisode}
+                placeholder="예: 12"
+              />
             )}
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="media-director">감독(작가)</Label>
-              <Input
-                id="media-director"
-                value={director}
-                onChange={(e) => setDirector(e.target.value)}
-              />
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="media-lead">주연배우</Label>
-              <Input
-                id="media-lead"
-                value={leadActor}
-                onChange={(e) => setLeadActor(e.target.value)}
-              />
-            </div>
+            <TextField
+              label="감독(작가)"
+              id="media-director"
+              value={director}
+              onChange={setDirector}
+            />
+            <TextField label="주연배우" id="media-lead" value={leadActor} onChange={setLeadActor} />
           </div>
 
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="media-review">감상평</Label>
+          <Field label="감상평" htmlFor="media-review">
             <Textarea
               id="media-review"
               value={review}
@@ -182,7 +147,7 @@ export function MediaLog() {
               placeholder="이 작품에 대한 감상평을 남겨보세요"
               rows={4}
             />
-          </div>
+          </Field>
 
           <div className="flex gap-2">
             <Button onClick={submit} className="self-start">
@@ -199,41 +164,28 @@ export function MediaLog() {
 
       <div className="flex flex-col gap-3">
         {sortedEntries.map((entry) => (
-          <Card key={entry.id}>
-            <CardContent className="flex flex-col gap-2">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Badge variant="secondary">{MEDIA_TYPE_LABEL[entry.mediaType]}</Badge>
-                  <span className="text-sm font-medium text-foreground">
-                    {entry.title}
-                    {entry.mediaType === 'drama' && entry.episode != null && ` (${entry.episode}화)`}
-                  </span>
-                </div>
-                <div className="flex shrink-0 gap-2">
-                  <button
-                    onClick={() => startEdit(entry)}
-                    className="text-xs text-muted-foreground hover:text-foreground"
-                  >
-                    수정
-                  </button>
-                  <button
-                    onClick={() => removeEntry(entry.id)}
-                    className="text-xs text-muted-foreground hover:text-foreground"
-                  >
-                    삭제
-                  </button>
-                </div>
+          <RecordCard
+            key={entry.id}
+            head={
+              <div className="flex items-center gap-2">
+                <Badge variant="secondary">{MEDIA_TYPE_LABEL[entry.mediaType]}</Badge>
+                <span className="text-sm font-medium text-foreground">
+                  {entry.title}
+                  {entry.mediaType === 'drama' && entry.episode != null && ` (${entry.episode}화)`}
+                </span>
               </div>
-              <div className="text-xs text-muted-foreground">
+            }
+            meta={
+              <>
                 {formatKoreanDate(entry.date)}
                 {entry.director && ` · 감독(작가) ${entry.director}`}
                 {entry.leadActor && ` · 주연 ${entry.leadActor}`}
-              </div>
-              {entry.review && (
-                <p className="whitespace-pre-wrap text-sm text-foreground">{entry.review}</p>
-              )}
-            </CardContent>
-          </Card>
+              </>
+            }
+            body={entry.review}
+            onEdit={() => startEdit(entry)}
+            onDelete={() => removeEntry(entry.id)}
+          />
         ))}
         {sortedEntries.length === 0 && (
           <p className="text-sm text-muted-foreground">기록된 드라마/영화가 없습니다.</p>

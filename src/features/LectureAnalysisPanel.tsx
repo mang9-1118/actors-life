@@ -1,17 +1,8 @@
 import { useMemo, useState } from 'react'
-import { Settings } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
-import { Textarea } from '@/components/ui/textarea'
+import { ChatComposer, ChatThread, PromptSetting, RecordList } from '@/components/common'
 import { useAnalysisStore } from '@/stores/useAnalysisStore'
 import {
   GeminiError,
@@ -48,8 +39,6 @@ export function LectureAnalysisPanel() {
   const [loadingAnalyze, setLoadingAnalyze] = useState(false)
   const [loadingChat, setLoadingChat] = useState(false)
   const [error, setError] = useState('')
-  const [promptDialogOpen, setPromptDialogOpen] = useState(false)
-  const [draftPrompt, setDraftPrompt] = useState('')
 
   const activeEntry = lectureAnalyses.find((e) => e.id === activeId) ?? null
   const draftEmbedUrl = useMemo(() => getYoutubeEmbedUrl(url), [url])
@@ -106,17 +95,13 @@ export function LectureAnalysisPanel() {
       <CardHeader className="flex flex-row items-center justify-between">
         <div className="flex items-center gap-1.5">
           <CardTitle className="text-lg">강의 듣기 분석</CardTitle>
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            aria-label="분석 AI 기준 설정"
-            onClick={() => {
-              setDraftPrompt(lectureAnalysisPrompt)
-              setPromptDialogOpen(true)
-            }}
-          >
-            <Settings />
-          </Button>
+          <PromptSetting
+            title="분석 AI 기준 설정"
+            description="AI가 강의 영상을 분석할 때 참고할 기준이나 강조하고 싶은 내용을 입력하세요."
+            placeholder="예: 발성 관련 내용이 나오면 더 자세히 풀어서 설명해줘."
+            value={lectureAnalysisPrompt}
+            onSave={setLectureAnalysisPrompt}
+          />
         </div>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
@@ -147,104 +132,32 @@ export function LectureAnalysisPanel() {
               {activeEntry.title ?? activeEntry.youtubeUrl}
             </a>
             <YoutubePlayer url={activeEntry.youtubeUrl} />
-            <div className="flex max-h-96 flex-col gap-2 overflow-y-auto">
-              {activeEntry.messages.map((msg, i) => (
-                <div
-                  key={i}
-                  className={`max-w-[85%] rounded-lg px-3 py-2 text-sm whitespace-pre-wrap ${
-                    msg.role === 'model'
-                      ? 'self-start bg-muted text-foreground'
-                      : 'self-end bg-primary text-primary-foreground'
-                  }`}
-                >
-                  {msg.text}
-                </div>
-              ))}
-            </div>
-            <div className="flex gap-2">
-              <Textarea
-                value={question}
-                onChange={(e) => setQuestion(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault()
-                    ask()
-                  }
-                }}
-                placeholder="이해가 안 되는 부분을 질문해보세요 (Shift+Enter로 줄바꿈)"
-                rows={1}
-                className="min-h-9 flex-1 resize-none"
-              />
-              <Button onClick={ask} disabled={loadingChat} variant="outline">
-                {loadingChat ? '답변 중...' : '질문하기'}
-              </Button>
-            </div>
+            <ChatThread messages={activeEntry.messages} />
+            <ChatComposer
+              value={question}
+              onChange={setQuestion}
+              onSubmit={ask}
+              placeholder="이해가 안 되는 부분을 질문해보세요 (Shift+Enter로 줄바꿈)"
+              submitLabel="질문하기"
+              busy={loadingChat}
+            />
           </div>
         )}
 
-        <ul className="flex flex-col gap-2">
-          {lectureAnalyses
+        <RecordList
+          rows={lectureAnalyses
             .slice()
             .reverse()
-            .map((item) => (
-              <li
-                key={item.id}
-                className={`flex items-center justify-between rounded-lg px-3 py-2 ${
-                  item.id === activeId ? 'bg-accent' : 'bg-muted'
-                }`}
-              >
-                <button
-                  onClick={() => setActiveId(item.id)}
-                  className="min-w-0 flex-1 truncate text-left text-sm font-medium text-foreground hover:text-primary"
-                >
-                  {item.title ?? item.youtubeUrl}
-                </button>
-                <button
-                  onClick={() => {
-                    removeLectureAnalysis(item.id)
-                    if (activeId === item.id) setActiveId(null)
-                  }}
-                  className="ml-2 shrink-0 text-xs text-muted-foreground hover:text-foreground"
-                >
-                  삭제
-                </button>
-              </li>
-            ))}
-          {lectureAnalyses.length === 0 && (
-            <li className="text-sm text-muted-foreground">분석한 강의가 없습니다.</li>
-          )}
-        </ul>
+            .map((item) => ({ id: item.id, label: item.title ?? item.youtubeUrl }))}
+          emptyText="분석한 강의가 없습니다."
+          activeId={activeId}
+          onSelect={setActiveId}
+          onDelete={(id) => {
+            removeLectureAnalysis(id)
+            if (activeId === id) setActiveId(null)
+          }}
+        />
       </CardContent>
-
-      <Dialog open={promptDialogOpen} onOpenChange={setPromptDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>분석 AI 기준 설정</DialogTitle>
-            <DialogDescription>
-              AI가 강의 영상을 분석할 때 참고할 기준이나 강조하고 싶은 내용을 입력하세요.
-            </DialogDescription>
-          </DialogHeader>
-          <Textarea
-            value={draftPrompt}
-            onChange={(e) => setDraftPrompt(e.target.value)}
-            placeholder="예: 발성 관련 내용이 나오면 더 자세히 풀어서 설명해줘."
-            className="min-h-32"
-          />
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setPromptDialogOpen(false)}>
-              취소
-            </Button>
-            <Button
-              onClick={() => {
-                setLectureAnalysisPrompt(draftPrompt)
-                setPromptDialogOpen(false)
-              }}
-            >
-              저장
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </Card>
   )
 }

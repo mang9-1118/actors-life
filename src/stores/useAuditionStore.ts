@@ -1,7 +1,14 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import { computeAutoStatus } from '@/lib/auditionStatus'
 import type { AuditionItem, AuditionStatus } from '@/types'
+
+/** An in-progress audition whose deadline has passed counts as closed; decided ones never change. */
+function computeAutoStatus(item: AuditionItem): AuditionStatus {
+  if (item.status === 'passed' || item.status === 'failed') return item.status
+  const deadlinePassed = new Date(`${item.deadline}T23:59:59`).getTime() < Date.now()
+  if (item.status === 'inProgress' && deadlinePassed) return 'closed'
+  return item.status
+}
 
 type NewAuditionInput = Omit<
   AuditionItem,
