@@ -5,6 +5,8 @@ import type { AuditionItem, AuditionMode, DateKey } from '@/types'
 export interface AuditionDraft {
   title: string
   organization: string
+  /** Not editable in the form, but carried through so editing never drops the notice link. */
+  url: string
   category: string
   mode: AuditionMode
   deadline: DateKey
@@ -16,6 +18,7 @@ export interface AuditionDraft {
 export const emptyAuditionDraft = (): AuditionDraft => ({
   title: '',
   organization: '',
+  url: '',
   category: '',
   mode: 'offline',
   deadline: todayKey(),
@@ -26,9 +29,10 @@ export const emptyAuditionDraft = (): AuditionDraft => ({
 export const draftFromItem = (item: AuditionItem): AuditionDraft => ({
   title: item.title,
   organization: item.organization,
-  // Defaulted rather than trusted: an item persisted before this field existed
-  // only gets it from the store migration, which zustand skips if the stored
+  // Defaulted rather than trusted: an item persisted before these fields existed
+  // only gets them from the store migration, which zustand skips if the stored
   // payload has no numeric version.
+  url: item.url ?? '',
   category: item.category ?? '',
   mode: item.mode,
   deadline: item.deadline,
@@ -39,6 +43,7 @@ export const draftFromItem = (item: AuditionItem): AuditionDraft => ({
 export const draftToItem = (draft: AuditionDraft) => ({
   title: draft.title.trim(),
   organization: draft.organization.trim(),
+  url: draft.url,
   category: draft.category.trim(),
   mode: draft.mode,
   deadline: draft.deadline,

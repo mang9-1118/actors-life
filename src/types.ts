@@ -62,6 +62,8 @@ export interface AuditionItem {
   id: string
   title: string
   organization: string
+  /** Link to the casting notice this was applied through. Empty for hand-entered auditions. */
+  url: string
   /** 작품 종류, e.g. '단편영화'. Empty when not given. */
   category: string
   mode: AuditionMode

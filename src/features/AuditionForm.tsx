@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useAuditionStore } from '@/stores/useAuditionStore'
+import { CastingError, fetchCastingNotice } from '@/lib/casting'
 import type { AuditionMode } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -75,6 +76,66 @@ export function AuditionFields({
   )
 }
 
+/**
+ * Fills the form below from a casting notice link, so the fields the notice
+ * states are not retyped. Applications made through a notice link are online.
+ */
+function CastingUrlField({ onLoad }: { onLoad: (draft: Partial<AuditionDraft>) => void }) {
+  const [url, setUrl] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+  const [notice, setNotice] = useState('')
+
+  const load = async () => {
+    const trimmed = url.trim()
+    if (!trimmed || loading) return
+    setLoading(true)
+    setError('')
+    setNotice('')
+    try {
+      const found = await fetchCastingNotice(trimmed)
+      onLoad({
+        title: found.title,
+        organization: found.organization,
+        // Saved so the board card's title can open the notice again.
+        url: found.url,
+        category: found.category,
+        mode: 'online',
+        // Left as it was when the notice states no closing date, so the form
+        // keeps a usable value instead of being cleared.
+        ...(found.deadline ? { deadline: found.deadline } : {}),
+      })
+      setUrl('')
+      if (!found.deadline) setNotice('공고에 마감일이 없어 마감일은 그대로 두었습니다.')
+    } catch (e) {
+      setError(e instanceof CastingError ? e.message : '공고를 불러오는 중 오류가 발생했습니다.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="flex gap-2">
+        <Input
+          value={url}
+          onChange={(e) => setUrl(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') load()
+          }}
+          placeholder="공고 주소를 붙여넣으면 아래 양식이 채워집니다"
+          className="flex-1"
+        />
+        <Button variant="outline" onClick={load} disabled={loading}>
+          {loading ? '불러오는 중...' : '불러오기'}
+        </Button>
+      </div>
+      {error && <p className="text-sm text-destructive">{error}</p>}
+      {notice && <p className="text-sm text-muted-foreground">{notice}</p>}
+    </div>
+  )
+}
+
 export function AuditionForm() {
   const addItem = useAuditionStore((s) => s.addItem)
   const [draft, setDraft] = useState<AuditionDraft>(emptyAuditionDraft)
@@ -89,6 +150,7 @@ export function AuditionForm() {
   return (
     <Card>
       <CardContent className="flex flex-col gap-4">
+        <CastingUrlField onLoad={(fields) => setDraft((prev) => ({ ...prev, ...fields }))} />
         <AuditionFields draft={draft} onChange={setDraft} />
         <Button onClick={submit} className="self-start">
           저장

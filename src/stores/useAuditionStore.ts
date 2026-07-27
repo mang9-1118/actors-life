@@ -11,18 +11,15 @@ function computeAutoStatus(item: AuditionItem): AuditionStatus {
 }
 
 /**
- * Gives every stored audition a `category`, and drops the `url` that the removed
- * casting-notice import used to save. Existing values always win.
+ * Backfills the fields the casting-notice import adds. Existing values always win,
+ * so an audition stored before v3 dropped `url` keeps the notice link it saved.
  */
-function migrateCategoryField(persisted: unknown): unknown {
+function migrateImportedFields(persisted: unknown): unknown {
   const state = persisted as { items?: unknown } | undefined
   if (!Array.isArray(state?.items)) return persisted
   return {
     ...state,
-    items: state.items.map((item: unknown) => {
-      const { url: _url, ...rest } = item as { url?: unknown }
-      return { category: '', ...rest }
-    }),
+    items: state.items.map((item: unknown) => ({ url: '', category: '', ...(item as object) })),
   }
 }
 
@@ -86,10 +83,10 @@ export const useAuditionStore = create<AuditionState>()(
     }),
     {
       name: 'audition-store',
-      version: 3,
+      version: 4,
       migrate: (persistedState, version) => {
-        if (version < 3) {
-          return migrateCategoryField(persistedState)
+        if (version < 4) {
+          return migrateImportedFields(persistedState)
         }
         return persistedState
       },
