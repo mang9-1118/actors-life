@@ -185,6 +185,26 @@ const SITES: CastingSite[] = [FILMMAKERS, PLFIL]
 const SUPPORTED_HINT = `지원하는 사이트: ${SITES.map((s) => s.label).join(', ')}`
 
 /**
+ * Filmmakers' bot filter answers 403 to requests that don't look like a browser
+ * opening the page — a User-Agent alone is not enough, so send what Chrome sends
+ * on a top-level navigation. (plfil serves anyone.)
+ */
+const BROWSER_HEADERS: Record<string, string> = {
+  'User-Agent':
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
+  Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+  'Accept-Language': 'ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7',
+  'Upgrade-Insecure-Requests': '1',
+  'Sec-Fetch-Dest': 'document',
+  'Sec-Fetch-Mode': 'navigate',
+  'Sec-Fetch-Site': 'none',
+  'Sec-Fetch-User': '?1',
+  'Sec-Ch-Ua': '"Chromium";v="126", "Not:A-Brand";v="24"',
+  'Sec-Ch-Ua-Mobile': '?0',
+  'Sec-Ch-Ua-Platform': '"Windows"',
+}
+
+/**
  * Reads a casting notice and returns just the fields the audition board needs.
  * Runs on the server because the casting sites send no CORS headers, and because
  * the host allowlist below must not be bypassable from the client.
@@ -231,19 +251,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   let html: string
   try {
-    const pageRes = await fetch(noticeUrl, {
-      headers: {
-        // The plain default agent gets bot-blocked by some casting sites.
-        'User-Agent':
-          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36',
-        'Accept-Language': 'ko-KR,ko;q=0.9',
-      },
-      signal: AbortSignal.timeout(10_000),
-    })
+    const pageRes = await fetch(noticeUrl, { headers: BROWSER_HEADERS, signal: AbortSignal.timeout(8_000) })
     if (!pageRes.ok) {
-      res
-        .status(502)
-        .json({ error: `공고 페이지를 불러올 수 없습니다 (${pageRes.status}).` })
+      // 403/429 is the notice site's bot filter rather than a bad URL.
+      const blocked = pageRes.status === 403 || pageRes.status === 429
+      res.status(502).json({
+        error: blocked
+          ? `공고 사이트가 서버에서의 접근을 차단했습니다 (${pageRes.status}). 잠시 후 다시 시도하거나 수기로 입력해주세요.`
+          : `공고 페이지를 불러올 수 없습니다 (${pageRes.status}).`,
+      })
       return
     }
     html = await pageRes.text()
