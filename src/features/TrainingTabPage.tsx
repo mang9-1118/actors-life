@@ -5,6 +5,7 @@ import { TRAINING_TABS } from '@/types'
 import { ScriptAnalysis1Panel, ScriptAnalysis2Panel } from '@/features/ScriptAnalysisPanels'
 import { AuditionBoard } from '@/features/AuditionBoard'
 import { AuditionForm } from '@/features/AuditionForm'
+import { CastingBookmarkletLink } from '@/features/CastingBookmarklet'
 import { ConceptSummaryPanel } from '@/features/ConceptSummaryPanel'
 import { LectureAnalysisPanel } from '@/features/LectureAnalysisPanel'
 import { Button } from '@/components/ui/button'
@@ -38,7 +39,7 @@ export function TrainingTabPage() {
         {tab.id === 'lecture' && <LectureAnalysisPanel />}
         {tab.id === 'auditionApply' && (
           <div className="flex flex-col gap-2">
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               {AUDITION_SITES.map((site) => (
                 <Button key={site.name} variant="outline" size="sm" asChild>
                   <a href={site.url} target="_blank" rel="noopener noreferrer">
@@ -47,7 +48,14 @@ export function TrainingTabPage() {
                   </a>
                 </Button>
               ))}
+              <CastingBookmarkletLink />
             </div>
+            {/* A bookmarklet has no affordance for "drag me to the bookmarks bar", so
+                this one line stays. */}
+            <p className="text-xs text-muted-foreground">
+              필름메이커스 공고는 <span className="font-medium">오디션 가져오기</span>를 북마크바에
+              끌어다 놓고, 공고 페이지에서 눌러 가져옵니다.
+            </p>
             <AuditionForm />
           </div>
         )}

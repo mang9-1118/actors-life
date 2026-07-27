@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useAuditionStore } from '@/stores/useAuditionStore'
-import { CastingError, fetchCastingNotice } from '@/lib/casting'
+import { CastingError, fetchCastingNotice, parseImportedNotice } from '@/lib/casting'
 import type { AuditionMode } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -8,7 +9,12 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Textarea } from '@/components/ui/textarea'
-import { draftToItem, emptyAuditionDraft, type AuditionDraft } from './auditionDraft'
+import {
+  draftFromNotice,
+  draftToItem,
+  emptyAuditionDraft,
+  type AuditionDraft,
+} from './auditionDraft'
 
 /** The audition detail fields, shared by the add form and the card's edit dialog. */
 export function AuditionFields({
@@ -94,17 +100,7 @@ function CastingUrlField({ onLoad }: { onLoad: (draft: Partial<AuditionDraft>) =
     setNotice('')
     try {
       const found = await fetchCastingNotice(trimmed)
-      onLoad({
-        title: found.title,
-        organization: found.organization,
-        // Saved so the board card's title can open the notice again.
-        url: found.url,
-        category: found.category,
-        mode: 'online',
-        // Left as it was when the notice states no closing date, so the form
-        // keeps a usable value instead of being cleared.
-        ...(found.deadline ? { deadline: found.deadline } : {}),
-      })
+      onLoad(draftFromNotice(found))
       setUrl('')
       if (!found.deadline) setNotice('공고에 마감일이 없어 마감일은 그대로 두었습니다.')
     } catch (e) {
@@ -139,6 +135,27 @@ function CastingUrlField({ onLoad }: { onLoad: (draft: Partial<AuditionDraft>) =
 export function AuditionForm() {
   const addItem = useAuditionStore((s) => s.addItem)
   const [draft, setDraft] = useState<AuditionDraft>(emptyAuditionDraft)
+  const [importError, setImportError] = useState('')
+  const [searchParams, setSearchParams] = useSearchParams()
+
+  // Values the bookmarklet read off a 필름메이커스 notice page arrive here.
+  useEffect(() => {
+    const raw = searchParams.get('import')
+    if (!raw) return
+
+    // Dropped whether or not it parses, so reloading the page cannot refill the form.
+    const rest = new URLSearchParams(searchParams)
+    rest.delete('import')
+    setSearchParams(rest, { replace: true })
+
+    const notice = parseImportedNotice(raw)
+    if (!notice) {
+      setImportError('공고 정보를 읽지 못했습니다. 공고 페이지에서 다시 눌러주세요.')
+      return
+    }
+    setImportError('')
+    setDraft((prev) => ({ ...prev, ...draftFromNotice(notice) }))
+  }, [searchParams, setSearchParams])
 
   const submit = () => {
     if (!draft.title.trim()) return
@@ -151,6 +168,7 @@ export function AuditionForm() {
     <Card>
       <CardContent className="flex flex-col gap-4">
         <CastingUrlField onLoad={(fields) => setDraft((prev) => ({ ...prev, ...fields }))} />
+        {importError && <p className="text-sm text-destructive">{importError}</p>}
         <AuditionFields draft={draft} onChange={setDraft} />
         <Button onClick={submit} className="self-start">
           저장

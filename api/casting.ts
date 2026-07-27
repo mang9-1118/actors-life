@@ -13,9 +13,9 @@ interface CastingSite {
 }
 
 /**
- * Both '2026-07-31T23:59:59+09:00' (filmmakers) and '2026-07-27T23:59:59.000Z'
- * (plfil, which serializes a KST end-of-day as if it were UTC) describe the last
- * moment of a Korean calendar day, so shifting into KST yields the day itself.
+ * plfil serializes a KST end-of-day as if it were UTC ('2026-07-26T23:59:59.000Z'
+ * is the last moment of 7/27 in Korea), so shifting into KST yields the day the
+ * site displays. Reading the string's own date part would be a day early.
  */
 function kstDateKey(iso: string): string | null {
   const time = new Date(iso).getTime()
@@ -48,93 +48,6 @@ function decodeHtmlEntities(text: string): string {
   })
 }
 
-/** Every JSON-LD block on the page, flattened so `@graph` and array payloads are included. */
-function jsonLdBlocks(html: string): Record<string, unknown>[] {
-  const blocks: Record<string, unknown>[] = []
-  const pattern = /<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi
-
-  for (const match of html.matchAll(pattern)) {
-    let parsed: unknown
-    try {
-      parsed = JSON.parse(match[1])
-    } catch {
-      continue
-    }
-    const candidates = Array.isArray(parsed) ? parsed : [parsed]
-    for (const candidate of candidates) {
-      if (!candidate || typeof candidate !== 'object') continue
-      const record = candidate as Record<string, unknown>
-      blocks.push(record)
-      if (Array.isArray(record['@graph'])) {
-        for (const node of record['@graph']) {
-          if (node && typeof node === 'object') blocks.push(node as Record<string, unknown>)
-        }
-      }
-    }
-  }
-  return blocks
-}
-
-/** Fields filmmakers hides behind a login say so in place of a value. */
-const MEMBERS_ONLY = '회원에게만'
-
-/** Inner HTML of a matched element, reduced to the plain text it displays. */
-function visibleText(inner: string): string {
-  const text = decodeHtmlEntities(inner.replace(/<[^>]+>/g, ' '))
-    .replace(/\s+/g, ' ')
-    .trim()
-  return text.includes(MEMBERS_ONLY) ? '' : text
-}
-
-/**
- * Filmmakers renders its notice details as label/value rows, where the value
- * carries this class. Labels are plain Korean words, so they need no escaping.
- */
-function labeledFieldText(html: string, label: string): string {
-  const valueClass = 'text-base text-neutral-900 dark:text-neutral-100'
-  const pattern = new RegExp(
-    `<span[^>]*>\\s*${label}\\s*</span>\\s*` +
-      `<(?:div|span)[^>]*class="[^"]*${valueClass}[^"]*"[^>]*>([\\s\\S]{0,300}?)</(?:div|span)>`,
-  )
-  const match = html.match(pattern)
-  return match ? visibleText(match[1]) : ''
-}
-
-/** First element carrying `className`, for values that have no label beside them. */
-function classedText(html: string, className: string): string {
-  const pattern = new RegExp(
-    `<([a-z0-9]+)[^>]*class="[^"]*${className}[^"]*"[^>]*>([\\s\\S]{0,200}?)</\\1>`,
-    'i',
-  )
-  const match = html.match(pattern)
-  return match ? visibleText(match[2]) : ''
-}
-
-const FILMMAKERS: CastingSite = {
-  label: '필름메이커스',
-  hosts: ['filmmakers.co.kr', 'www.filmmakers.co.kr'],
-  parse: (html) => {
-    // Casting notices carry a schema.org JobPosting; other board pages do not.
-    const posting = jsonLdBlocks(html).find((block) => block['@type'] === 'JobPosting')
-    if (!posting) return null
-
-    // The notice title is a long recruiting sentence, so prefer the work's own
-    // name; fall back to the notice title when a notice omits '작품 제목'.
-    const noticeTitle =
-      typeof posting.title === 'string' ? decodeHtmlEntities(posting.title).trim() : ''
-    const title = labeledFieldText(html, '작품 제목') || noticeTitle
-    if (!title) return null
-
-    const category = classedText(
-      html,
-      'text-sub font-bold opacity-80 decoration-indigo-200 text-base',
-    )
-
-    const validThrough = typeof posting.validThrough === 'string' ? posting.validThrough : ''
-    return { title, category, deadline: validThrough ? kstDateKey(validThrough) : null }
-  },
-}
-
 /** The `data` payload of plfil's Next.js page props, which holds the whole notice. */
 function plfilNoticeData(html: string): Record<string, unknown> | null {
   const match = html.match(/<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/)
@@ -161,7 +74,7 @@ const PLFIL: CastingSite = {
     const data = plfilNoticeData(html)
     if (!data || typeof data.castingEndDate !== 'string') return null
 
-    // Match filmmakers: prefer the work's own name over the recruiting sentence.
+    // The notice title is a recruiting sentence, so prefer the work's own name.
     const title = stringField(data, 'artWorkName') || stringField(data, 'title')
     if (!title) return null
 
@@ -174,15 +87,17 @@ const PLFIL: CastingSite = {
   },
 }
 
-const SITES: CastingSite[] = [FILMMAKERS, PLFIL]
-
-const SUPPORTED_HINT = `지원하는 사이트: ${SITES.map((s) => s.label).join(', ')}`
-
 /**
- * Filmmakers' bot filter answers 403 to requests that don't look like a browser
- * opening the page — a User-Agent alone is not enough, so send what Chrome sends
- * on a top-level navigation. (plfil serves anyone.)
+ * Only plfil. 필름메이커스 refuses requests from Vercel's addresses — measured on
+ * Node in two regions and on the edge runtime, with complete browser headers, while
+ * the same code answers 200 from a home connection. Its notices are read by the
+ * member's own browser instead, through the bookmarklet in `src/lib/castingBookmarklet.ts`.
  */
+const SITES: CastingSite[] = [PLFIL]
+
+const SUPPORTED_HINT = `주소로 불러올 수 있는 사이트: ${SITES.map((s) => s.label).join(', ')}`
+
+/** Sent because a bare fetch looks nothing like a browser opening the page. */
 const BROWSER_HEADERS: Record<string, string> = {
   'User-Agent':
     'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
@@ -193,17 +108,8 @@ const BROWSER_HEADERS: Record<string, string> = {
   'Sec-Fetch-Mode': 'navigate',
   'Sec-Fetch-Site': 'none',
   'Sec-Fetch-User': '?1',
-  'Sec-Ch-Ua': '"Chromium";v="126", "Not:A-Brand";v="24"',
-  'Sec-Ch-Ua-Mobile': '?0',
-  'Sec-Ch-Ua-Platform': '"Windows"',
 }
 
-/**
- * Runs on Vercel's edge network rather than as a Node function: filmmakers'
- * filter refuses requests from the serverless region's addresses (both us-east
- * and Seoul, with complete browser headers), and the edge network egresses from
- * a different range. Edge also has no 10s ceiling, which filmmakers needs.
- */
 export const config = { runtime: 'edge' }
 
 function json(body: unknown, status: number): Response {
@@ -250,12 +156,11 @@ export default async function handler(req: Request): Promise<Response> {
     return json({ error: `지원하지 않는 사이트입니다. ${SUPPORTED_HINT}` }, 400)
   }
 
-  // Notice pages need no query string, and dropping it keeps the request tidy.
+  // Notice pages need no query string, and dropping it keeps the saved link tidy.
   const noticeUrl = `${parsedUrl.origin}${parsedUrl.pathname}`
 
   let html: string
   try {
-    // Filmmakers routinely takes 5-7s to answer, so leave real headroom.
     const pageRes = await fetch(noticeUrl, {
       headers: BROWSER_HEADERS,
       signal: AbortSignal.timeout(20_000),

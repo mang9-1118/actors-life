@@ -1,3 +1,4 @@
+import type { CastingNotice } from '@/lib/casting'
 import { todayKey } from '@/lib/time'
 import type { AuditionItem, AuditionMode, DateKey } from '@/types'
 
@@ -38,6 +39,20 @@ export const draftFromItem = (item: AuditionItem): AuditionDraft => ({
   deadline: item.deadline,
   announceDate: item.announceDate ?? '',
   memo: item.memo,
+})
+
+/**
+ * The fields a casting notice fills in, whether it came from the address box or
+ * the bookmarklet. Applications made through a notice are online. The deadline is
+ * left as it was when the notice states none, so the form keeps a usable value.
+ */
+export const draftFromNotice = (notice: CastingNotice): Partial<AuditionDraft> => ({
+  title: notice.title,
+  organization: notice.organization,
+  url: notice.url,
+  category: notice.category,
+  mode: 'online',
+  ...(notice.deadline ? { deadline: notice.deadline } : {}),
 })
 
 export const draftToItem = (draft: AuditionDraft) => ({
