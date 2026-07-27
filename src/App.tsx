@@ -4,7 +4,6 @@ import { Dashboard } from '@/features/Dashboard'
 import { TrainingTabPage } from '@/features/TrainingTabPage'
 import { MediaLog } from '@/features/MediaLog'
 import { ReadingLog } from '@/features/ReadingLog'
-import { Auditions } from '@/features/Auditions'
 import { AuditionCalendarPage } from '@/features/AuditionCalendar'
 import { ClassNotes } from '@/features/ClassNotes'
 import { WeeklyAnalysis } from '@/features/WeeklyAnalysis'
@@ -30,7 +29,11 @@ function App() {
           <Route path="train/:tabPath" element={<TrainingTabPage />} />
           <Route path="media-log" element={<MediaLog />} />
           <Route path="reading-log" element={<ReadingLog />} />
-          <Route path="auditions" element={<Auditions />} />
+          {/* The status board moved into the 오디션 지원 tab; keep old links working. */}
+          <Route
+            path="auditions"
+            element={<Navigate to="/train/audition-apply" replace />}
+          />
           <Route path="calendar" element={<AuditionCalendarPage />} />
           <Route path="class-notes" element={<ClassNotes />} />
           <Route path="weekly" element={<WeeklyAnalysis />} />

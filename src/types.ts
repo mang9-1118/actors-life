@@ -26,7 +26,6 @@ export const TRAINING_TAB_IDS: TrainingTabId[] = TRAINING_TABS.map((tab) => tab.
 export type OtherTabId =
   | 'media-log'
   | 'reading-log'
-  | 'auditions'
   | 'calendar'
   | 'class-notes'
   | 'weekly'
@@ -40,7 +39,6 @@ export interface OtherTabMeta {
 export const OTHER_TABS: OtherTabMeta[] = [
   { id: 'media-log', label: '드라마/영화 시청', path: '/media-log' },
   { id: 'reading-log', label: '독서', path: '/reading-log' },
-  { id: 'auditions', label: '오디션 현황 보드', path: '/auditions' },
   { id: 'calendar', label: '캘린더', path: '/calendar' },
   { id: 'class-notes', label: '수업내용 정리', path: '/class-notes' },
   { id: 'weekly', label: '주간 분석', path: '/weekly' },
@@ -64,6 +62,10 @@ export interface AuditionItem {
   id: string
   title: string
   organization: string
+  /** Link to the casting notice this was applied through. Empty for hand-entered auditions. */
+  url: string
+  /** 작품 종류, e.g. '단편영화'. Empty when the notice does not state one. */
+  category: string
   mode: AuditionMode
   deadline: DateKey
   announceDate: DateKey | null

@@ -10,6 +10,16 @@ function computeAutoStatus(item: AuditionItem): AuditionStatus {
   return item.status
 }
 
+/** Backfills fields added by the casting-notice import; existing values always win. */
+function migrateImportedFields(persisted: unknown): unknown {
+  const state = persisted as { items?: unknown } | undefined
+  if (!Array.isArray(state?.items)) return persisted
+  return {
+    ...state,
+    items: state.items.map((item: unknown) => ({ url: '', category: '', ...(item as object) })),
+  }
+}
+
 type NewAuditionInput = Omit<
   AuditionItem,
   'id' | 'status' | 'createdAt' | 'auditionDate' | 'auditionTime' | 'auditionLocation'
@@ -68,6 +78,15 @@ export const useAuditionStore = create<AuditionState>()(
           }),
         })),
     }),
-    { name: 'audition-store' },
+    {
+      name: 'audition-store',
+      version: 2,
+      migrate: (persistedState, version) => {
+        if (version < 2) {
+          return migrateImportedFields(persistedState)
+        }
+        return persistedState
+      },
+    },
   ),
 )

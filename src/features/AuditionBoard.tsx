@@ -2,7 +2,6 @@ import { useEffect } from 'react'
 import { DndContext, useDroppable, type DragEndEvent } from '@dnd-kit/core'
 import { useAuditionStore } from '@/stores/useAuditionStore'
 import type { AuditionItem, AuditionStatus } from '@/types'
-import { AuditionForm } from './AuditionForm'
 import { AuditionCard } from './AuditionCard'
 
 const COLUMNS: { status: AuditionStatus; label: string }[] = [
@@ -43,9 +42,17 @@ function AuditionColumn({
   )
 }
 
-function AuditionBoard() {
+export function AuditionBoard() {
   const items = useAuditionStore((s) => s.items)
   const setStatus = useAuditionStore((s) => s.setStatus)
+  const refreshAutoStatuses = useAuditionStore((s) => s.refreshAutoStatuses)
+
+  // Auditions whose deadline has passed move themselves to '마감된 오디션'.
+  useEffect(() => {
+    refreshAutoStatuses()
+    const id = setInterval(refreshAutoStatuses, 60_000)
+    return () => clearInterval(id)
+  }, [refreshAutoStatuses])
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event
@@ -69,25 +76,5 @@ function AuditionBoard() {
         ))}
       </div>
     </DndContext>
-  )
-}
-
-export function Auditions() {
-  const refreshAutoStatuses = useAuditionStore((s) => s.refreshAutoStatuses)
-
-  useEffect(() => {
-    refreshAutoStatuses()
-    const id = setInterval(refreshAutoStatuses, 60_000)
-    return () => clearInterval(id)
-  }, [refreshAutoStatuses])
-
-  return (
-    <div className="flex flex-col gap-6">
-      <h1 className="text-2xl font-heading font-semibold text-foreground">오디션 현황 보드</h1>
-
-      <AuditionForm />
-
-      <AuditionBoard />
-    </div>
   )
 }

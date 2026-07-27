@@ -26,11 +26,17 @@ export function AuditionFields({
         value={draft.title}
         onChange={(e) => set('title', e.target.value)}
         placeholder="오디션명"
+        className="col-span-2"
       />
       <Input
         value={draft.organization}
         onChange={(e) => set('organization', e.target.value)}
         placeholder="지원처"
+      />
+      <Input
+        value={draft.category}
+        onChange={(e) => set('category', e.target.value)}
+        placeholder="작품 종류"
       />
       <Label className="flex flex-col items-start gap-1 text-xs text-muted-foreground">
         마감일
