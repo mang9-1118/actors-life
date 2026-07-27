@@ -1,5 +1,3 @@
-import type { VercelRequest, VercelResponse } from '@vercel/node'
-
 interface ParsedNotice {
   title: string
   /** 작품 종류, e.g. '단편영화'. Empty when the notice does not state one. */
@@ -162,45 +160,55 @@ const BROWSER_HEADERS: Record<string, string> = {
 }
 
 /**
+ * Runs on Vercel's edge network rather than as a Node function: filmmakers'
+ * filter refuses requests from the serverless region's addresses (both us-east
+ * and Seoul, with complete browser headers), and the edge network egresses from
+ * a different range.
+ */
+export const config = { runtime: 'edge' }
+
+function json(body: unknown, status: number): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { 'Content-Type': 'application/json; charset=utf-8' },
+  })
+}
+
+/**
  * Reads a casting notice and returns just the fields the audition board needs.
  * Runs on the server because the casting sites send no CORS headers, and because
  * the host allowlist below must not be bypassable from the client.
  */
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+export default async function handler(req: Request): Promise<Response> {
   if (req.method !== 'POST') {
-    res.status(405).json({ error: 'Method not allowed' })
-    return
+    return json({ error: 'Method not allowed' }, 405)
   }
 
   const accessKey = process.env.APP_ACCESS_KEY
-  if (accessKey && req.headers['x-app-key'] !== accessKey) {
-    res.status(401).json({ error: '접근 권한이 없습니다.' })
-    return
+  if (accessKey && req.headers.get('x-app-key') !== accessKey) {
+    return json({ error: '접근 권한이 없습니다.' }, 401)
   }
 
-  const rawUrl = (req.body as { url?: unknown } | undefined)?.url
+  const body = (await req.json().catch(() => null)) as { url?: unknown } | null
+  const rawUrl = body?.url
   if (typeof rawUrl !== 'string' || !rawUrl.trim()) {
-    res.status(400).json({ error: '공고 주소가 필요합니다.' })
-    return
+    return json({ error: '공고 주소가 필요합니다.' }, 400)
   }
 
   let parsedUrl: URL
   try {
     parsedUrl = new URL(rawUrl.trim())
   } catch {
-    res.status(400).json({ error: '주소 형식이 올바르지 않습니다.' })
-    return
+    return json({ error: '주소 형식이 올바르지 않습니다.' }, 400)
   }
 
   if (parsedUrl.protocol !== 'https:' && parsedUrl.protocol !== 'http:') {
-    res.status(400).json({ error: '주소 형식이 올바르지 않습니다.' })
-    return
+    return json({ error: '주소 형식이 올바르지 않습니다.' }, 400)
   }
 
   const site = SITES.find((s) => s.hosts.includes(parsedUrl.hostname.toLowerCase()))
   if (!site) {
-    res.status(400).json({ error: `지원하지 않는 사이트입니다. ${SUPPORTED_HINT}` })
-    return
+    return json({ error: `지원하지 않는 사이트입니다. ${SUPPORTED_HINT}` }, 400)
   }
 
   // Notice pages need no query string, and dropping it keeps the saved link tidy.
@@ -208,37 +216,46 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   let html: string
   try {
-    const pageRes = await fetch(noticeUrl, { headers: BROWSER_HEADERS, signal: AbortSignal.timeout(8_000) })
+    // Filmmakers routinely takes 5-7s to answer, so leave real headroom; the
+    // edge runtime allows far longer than a Node function's 10s ceiling.
+    const pageRes = await fetch(noticeUrl, {
+      headers: BROWSER_HEADERS,
+      signal: AbortSignal.timeout(20_000),
+    })
     if (!pageRes.ok) {
       // 403/429 is the notice site's bot filter rather than a bad URL.
       const blocked = pageRes.status === 403 || pageRes.status === 429
-      res.status(502).json({
-        error: blocked
-          ? `공고 사이트가 서버에서의 접근을 차단했습니다 (${pageRes.status}). 잠시 후 다시 시도하거나 수기로 입력해주세요.`
-          : `공고 페이지를 불러올 수 없습니다 (${pageRes.status}).`,
-      })
-      return
+      return json(
+        {
+          error: blocked
+            ? `공고 사이트가 서버에서의 접근을 차단했습니다 (${pageRes.status}). 잠시 후 다시 시도하거나 수기로 입력해주세요.`
+            : `공고 페이지를 불러올 수 없습니다 (${pageRes.status}).`,
+        },
+        502,
+      )
     }
     html = await pageRes.text()
   } catch {
-    res.status(504).json({ error: '공고 페이지를 불러오는 데 실패했습니다.' })
-    return
+    return json({ error: '공고 페이지를 불러오는 데 실패했습니다.' }, 504)
   }
 
   const notice = site.parse(html)
   if (!notice) {
-    res
-      .status(422)
-      .json({ error: '공고 정보를 찾을 수 없습니다. 모집 공고 상세 페이지 주소인지 확인해주세요.' })
-    return
+    return json(
+      { error: '공고 정보를 찾을 수 없습니다. 모집 공고 상세 페이지 주소인지 확인해주세요.' },
+      422,
+    )
   }
 
-  res.status(200).json({
-    title: notice.title,
-    organization: site.label,
-    category: notice.category,
-    deadline: notice.deadline,
-    mode: site.mode,
-    url: noticeUrl,
-  })
+  return json(
+    {
+      title: notice.title,
+      organization: site.label,
+      category: notice.category,
+      deadline: notice.deadline,
+      mode: site.mode,
+      url: noticeUrl,
+    },
+    200,
+  )
 }
