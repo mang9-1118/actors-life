@@ -117,9 +117,29 @@ function readCastingNotice(appUrl: string, appKey: string): void {
     url: location.origin + location.pathname,
   }
 
-  /* Left with the app's server for whichever tab has the app open to pick up, so no
-     tab is opened and the notice page is not disturbed. Opening one is the fallback
-     for when the server cannot be reached. */
+  var toast = function (message: string, bad: boolean): void {
+    var box = document.createElement('div')
+    box.textContent = message
+    box.setAttribute(
+      'style',
+      'position:fixed;z-index:2147483647;left:50%;top:24px;transform:translateX(-50%);' +
+        'max-width:80vw;padding:12px 18px;border-radius:10px;color:#fff;background:' +
+        (bad ? '#b3261e' : '#111') +
+        ';font:600 14px/1.4 system-ui,-apple-system,sans-serif;box-shadow:0 6px 24px rgba(0,0,0,.3)',
+    )
+    document.body.appendChild(box)
+    setTimeout(
+      function () {
+        box.remove()
+      },
+      bad ? 6000 : 2400,
+    )
+  }
+
+  /* Left with the app's server for whichever tab already has the app open, so no tab
+     is opened and the notice page is not disturbed. A failure says why and stops there
+     rather than opening one: a stray tab holding a half-entered audition is worse than
+     pressing again once the cause is fixed. */
   var headers: Record<string, string> = { 'Content-Type': 'application/json' }
   if (appKey) headers['x-app-key'] = appKey
 
@@ -129,26 +149,28 @@ function readCastingNotice(appUrl: string, appKey: string): void {
     body: JSON.stringify(payload),
   })
     .then(function (res) {
-      if (!res.ok) throw new Error(String(res.status))
-      var box = document.createElement('div')
-      box.textContent = '배우의 삶에 담았습니다 · ' + title
-      box.setAttribute(
-        'style',
-        'position:fixed;z-index:2147483647;left:50%;top:24px;transform:translateX(-50%);' +
-          'max-width:80vw;padding:12px 18px;border-radius:10px;background:#111;color:#fff;' +
-          'font:600 14px/1.4 system-ui,-apple-system,sans-serif;box-shadow:0 6px 24px rgba(0,0,0,.3)',
-      )
-      document.body.appendChild(box)
-      setTimeout(function () {
-        box.remove()
-      }, 2400)
+      if (res.ok) return ''
+      return res
+        .text()
+        .catch(function () {
+          return ''
+        })
+        .then(function (body: string) {
+          var detail = ''
+          try {
+            detail = JSON.parse(body).error || ''
+          } catch {
+            detail = ''
+          }
+          throw new Error(res.status + (detail ? ' · ' + detail : ''))
+        })
     })
-    .catch(function () {
-      var target =
-        appUrl + '#/train/audition-apply?import=' + encodeURIComponent(JSON.stringify(payload))
-      var opened = window.open(target, 'actorsLifeCastingImport')
-      if (!opened) location.href = target
-      else if (opened.focus) opened.focus()
+    .then(function () {
+      toast('배우의 삶에 담았습니다 · ' + title, false)
+    })
+    .catch(function (e: unknown) {
+      var reason = e instanceof Error && e.message ? e.message : '서버에 닿지 못했습니다'
+      toast('배우의 삶으로 보내지 못했습니다 (' + reason + ')', true)
     })
 }
 

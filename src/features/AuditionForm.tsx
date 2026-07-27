@@ -178,7 +178,8 @@ export function AuditionForm() {
     }
   }, [fill])
 
-  // Where the bookmarklet's values land when it could not reach the server.
+  // Kept for bookmarklets saved before the inbox existed, which navigate here with the
+  // values in the hash instead of leaving them with the server.
   useEffect(() => {
     const raw = searchParams.get('import')
     if (!raw) return
