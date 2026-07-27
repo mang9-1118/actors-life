@@ -39,8 +39,19 @@ function readCastingNotice(appUrl: string): void {
     return text.indexOf('회원에게만') === -1 ? text : ''
   }
 
-  /* Both sites state the last moment of a Korean calendar day, so shifting into
-     KST yields the day each one displays. */
+  /* Both sites lay their notice details out as label/value pairs of siblings. */
+  var labelled = function (selector: string, label: string): string {
+    var rows = document.querySelectorAll(selector)
+    for (var r = 0; r < rows.length; r++) {
+      if (clean(rows[r].textContent) !== label) continue
+      var value = visible(rows[r].nextElementSibling)
+      if (value) return value
+    }
+    return ''
+  }
+
+  /* Filmmakers states the last moment of a Korean calendar day, so shifting into
+     KST yields the day it displays. */
   var dateKey = function (iso: unknown): string {
     if (typeof iso !== 'string') return ''
     var closes = new Date(iso).getTime()
@@ -53,29 +64,18 @@ function readCastingNotice(appUrl: string): void {
   var deadline = ''
 
   if (isPlfil) {
-    var nextData = document.getElementById('__NEXT_DATA__')
-    var data: Record<string, unknown> | null = null
-    if (nextData) {
-      try {
-        var parsedProps = JSON.parse(nextData.textContent || '') as {
-          props?: { pageProps?: { data?: unknown } }
-        }
-        var payloadData = parsedProps.props?.pageProps?.data
-        if (payloadData && typeof payloadData === 'object') {
-          data = payloadData as Record<string, unknown>
-        }
-      } catch {
-        data = null
-      }
-    }
-    /* Only a notice detail page carries one notice, with its closing date, here. */
-    if (!data || typeof data.castingEndDate !== 'string') {
+    /* Read from the page rather than from `__NEXT_DATA__`: that script keeps whatever
+       the first loaded page put there, so after clicking through from the list it
+       still describes the list. What is on screen is always this notice. */
+    var closing = labelled('p', '공고 모집 마감일')
+    title = labelled('p', '작품명')
+    if (!title && !closing) {
       window.alert('플필 모집 공고 상세 페이지에서 눌러주세요.')
       return
     }
-    title = decode(data.artWorkName) || decode(data.title)
-    category = decode(data.artCategoryName)
-    deadline = dateKey(data.castingEndDate)
+    category = labelled('p', '작품 카테고리')
+    /* Already the Korean calendar day the site shows, so it needs no shifting. */
+    deadline = /^\d{4}-\d{2}-\d{2}$/.test(closing) ? closing : ''
   } else {
     var posting: Record<string, unknown> | null = null
     var scripts = document.querySelectorAll('script[type="application/ld+json"]')
@@ -100,14 +100,7 @@ function readCastingNotice(appUrl: string): void {
       return
     }
 
-    var labels = document.querySelectorAll('span')
-    for (var k = 0; k < labels.length; k++) {
-      if (visible(labels[k]) === '작품 제목') {
-        title = visible(labels[k].nextElementSibling)
-        if (title) break
-      }
-    }
-    if (!title) title = decode(posting.title)
+    title = labelled('span', '작품 제목') || decode(posting.title)
     category = visible(document.querySelector('.text-sub.font-bold.opacity-80'))
     deadline = dateKey(posting.validThrough)
   }
