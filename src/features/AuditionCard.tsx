@@ -51,19 +51,7 @@ export function AuditionCard({ item }: { item: AuditionItem }) {
         className={`gap-1 p-3 text-sm ${isDragging ? 'opacity-50' : ''}`}
       >
         <div className="flex items-center justify-between">
-          {item.url ? (
-            <a
-              href={item.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              onPointerDown={(e) => e.stopPropagation()}
-              className="cursor-pointer font-medium text-foreground underline-offset-4 hover:font-semibold hover:underline focus-visible:font-semibold focus-visible:underline"
-            >
-              {item.title}
-            </a>
-          ) : (
-            <span className="font-medium text-foreground">{item.title}</span>
-          )}
+          <span className="font-medium text-foreground">{item.title}</span>
           <div className="shrink-0" onPointerDown={(e) => e.stopPropagation()}>
             <RowActions onEdit={openEdit} onDelete={() => removeItem(item.id)} />
           </div>

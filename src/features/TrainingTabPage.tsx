@@ -5,7 +5,6 @@ import { TRAINING_TABS } from '@/types'
 import { ScriptAnalysis1Panel, ScriptAnalysis2Panel } from '@/features/ScriptAnalysisPanels'
 import { AuditionBoard } from '@/features/AuditionBoard'
 import { AuditionForm } from '@/features/AuditionForm'
-import { CastingUrlImport } from '@/features/CastingUrlImport'
 import { ConceptSummaryPanel } from '@/features/ConceptSummaryPanel'
 import { LectureAnalysisPanel } from '@/features/LectureAnalysisPanel'
 import { Button } from '@/components/ui/button'
@@ -49,7 +48,6 @@ export function TrainingTabPage() {
                 </Button>
               ))}
             </div>
-            <CastingUrlImport />
             <AuditionForm />
           </div>
         )}
