@@ -18,9 +18,8 @@ interface CastingSite {
 }
 
 /**
- * Both '2026-07-31T23:59:59+09:00' (filmmakers) and '2026-07-27T23:59:59.000Z'
- * (plfil, which serializes a KST end-of-day as if it were UTC) describe the last
- * moment of a Korean calendar day, so shifting into KST yields the day itself.
+ * Filmmakers states its closing time as '2026-07-31T23:59:59+09:00' — the last
+ * moment of a Korean calendar day — so shifting into KST yields the day itself.
  */
 function kstDateKey(iso: string): string | null {
   const time = new Date(iso).getTime()
@@ -138,56 +137,14 @@ const FILMMAKERS: CastingSite = {
   },
 }
 
-/** The `data` payload of plfil's Next.js page props, which holds the whole notice. */
-function plfilNoticeData(html: string): Record<string, unknown> | null {
-  const match = html.match(
-    /<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/,
-  )
-  if (!match) return null
-  try {
-    const parsed = JSON.parse(match[1]) as { props?: { pageProps?: { data?: unknown } } }
-    const data = parsed.props?.pageProps?.data
-    return data && typeof data === 'object' ? (data as Record<string, unknown>) : null
-  } catch {
-    return null
-  }
-}
-
-function stringField(data: Record<string, unknown>, key: string): string {
-  const value = data[key]
-  return typeof value === 'string' ? decodeHtmlEntities(value).trim() : ''
-}
-
-const PLFIL: CastingSite = {
-  label: '플필',
-  hosts: ['plfil.com', 'www.plfil.com'],
-  mode: 'online',
-  parse: (html) => {
-    // Only notice detail pages carry a single notice under pageProps.data.
-    const data = plfilNoticeData(html)
-    if (!data || typeof data.castingEndDate !== 'string') return null
-
-    // Match filmmakers: prefer the work's own name over the recruiting sentence.
-    const title = stringField(data, 'artWorkName') || stringField(data, 'title')
-    if (!title) return null
-
-    const castingEndDate = stringField(data, 'castingEndDate')
-    return {
-      title,
-      category: stringField(data, 'artCategoryName'),
-      deadline: castingEndDate ? kstDateKey(castingEndDate) : null,
-    }
-  },
-}
-
-const SITES: CastingSite[] = [FILMMAKERS, PLFIL]
+const SITES: CastingSite[] = [FILMMAKERS]
 
 const SUPPORTED_HINT = `지원하는 사이트: ${SITES.map((s) => s.label).join(', ')}`
 
 /**
  * Filmmakers' bot filter answers 403 to requests that don't look like a browser
  * opening the page — a User-Agent alone is not enough, so send what Chrome sends
- * on a top-level navigation. (plfil serves anyone.)
+ * on a top-level navigation.
  */
 const BROWSER_HEADERS: Record<string, string> = {
   'User-Agent':
