@@ -27,6 +27,16 @@ import {
   useTabOrderStore,
 } from '@/stores/tabOrder'
 import { runQuickBackup } from '@/lib/backup'
+import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog'
 
 const useSidebarStore = create<{ collapsed: boolean; toggle: () => void }>()(
   persist(
@@ -114,8 +124,10 @@ function SortableNavList<Id extends string>({
 
 function QuickBackupButton() {
   const [status, setStatus] = useState<'idle' | 'busy' | 'done' | 'error'>('idle')
+  const [confirming, setConfirming] = useState(false)
 
   const runBackup = async () => {
+    setConfirming(false)
     if (status === 'busy') return
     setStatus('busy')
     try {
@@ -141,23 +153,41 @@ function QuickBackupButton() {
           {status === 'error' ? '백업 실패' : '백업되었습니다'}
         </span>
       )}
-      <button
-        onClick={runBackup}
-        disabled={status === 'busy'}
-        aria-label={label}
-        title={label}
-        className={`flex size-9 items-center justify-center rounded-lg transition-all active:scale-90 ${
-          status === 'busy'
-            ? 'bg-sidebar-accent text-sidebar-accent-foreground'
-            : 'text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
-        }`}
-      >
-        {status === 'busy' ? (
-          <Loader2 className="size-4 animate-spin" />
-        ) : (
-          <CloudBackup className="size-4" />
-        )}
-      </button>
+      <Dialog open={confirming} onOpenChange={setConfirming}>
+        <DialogTrigger asChild>
+          <button
+            disabled={status === 'busy'}
+            aria-label={label}
+            title={label}
+            className={`flex size-9 items-center justify-center rounded-lg transition-all active:scale-90 ${
+              status === 'busy'
+                ? 'bg-sidebar-accent text-sidebar-accent-foreground'
+                : 'text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
+            }`}
+          >
+            {status === 'busy' ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <CloudBackup className="size-4" />
+            )}
+          </button>
+        </DialogTrigger>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>지금 백업하시겠습니까?</DialogTitle>
+            <DialogDescription>
+              현재 기록 전체를 클라우드에 올립니다. 서버에는 최근 3개만 남아, 가장 오래된 백업은
+              지워집니다.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConfirming(false)}>
+              취소
+            </Button>
+            <Button onClick={runBackup}>백업</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
