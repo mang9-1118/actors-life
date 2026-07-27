@@ -4,9 +4,9 @@ import { castingBookmarkletHref, currentAppUrl } from '@/lib/castingBookmarklet'
 import { Button } from '@/components/ui/button'
 
 /**
- * Dragged onto the bookmarks bar once, then pressed on a 필름메이커스 notice page to
- * bring its 오디션명 · 작품 종류 · 마감일 back to the form. Filmmakers refuses the
- * server, so its notices can only be read by the member's own browser.
+ * Dragged onto the bookmarks bar once, then pressed on a 필름메이커스 or 플필 notice
+ * page to bring its 오디션명 · 작품 종류 · 마감일 back to the form. Filmmakers refuses
+ * the server, so its notices can only be read by the member's own browser.
  */
 export function CastingBookmarkletLink() {
   const ref = useRef<HTMLAnchorElement>(null)

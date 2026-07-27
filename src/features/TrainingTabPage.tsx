@@ -53,8 +53,8 @@ export function TrainingTabPage() {
             {/* A bookmarklet has no affordance for "drag me to the bookmarks bar", so
                 this one line stays. */}
             <p className="text-xs text-muted-foreground">
-              필름메이커스 공고는 <span className="font-medium">오디션 가져오기</span>를 북마크바에
-              끌어다 놓고, 공고 페이지에서 눌러 가져옵니다.
+              <span className="font-medium">오디션 가져오기</span>를 북마크바에 끌어다 놓으면, 두
+              사이트의 공고 페이지에서 눌러 가져올 수 있습니다.
             </p>
             <AuditionForm />
           </div>
