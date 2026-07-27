@@ -149,7 +149,11 @@ function readCastingNotice(appUrl: string, appKey: string): void {
     body: JSON.stringify(payload),
   })
     .then(function (res) {
-      if (res.ok) return ''
+      if (res.ok) {
+        toast('배우의 삶에 담았습니다 · ' + title, false)
+        return
+      }
+      /* The server's own wording is more use than a bare status, when there is one. */
       return res
         .text()
         .catch(function () {
@@ -164,9 +168,6 @@ function readCastingNotice(appUrl: string, appKey: string): void {
           }
           throw new Error(res.status + (detail ? ' · ' + detail : ''))
         })
-    })
-    .then(function () {
-      toast('배우의 삶에 담았습니다 · ' + title, false)
     })
     .catch(function (e: unknown) {
       var reason = e instanceof Error && e.message ? e.message : '서버에 닿지 못했습니다'

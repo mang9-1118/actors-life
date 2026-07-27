@@ -1,3 +1,4 @@
+import { authHeaders } from '@/lib/appApi'
 import { useSettingsStore } from '@/stores/useSettingsStore'
 
 // settings-store (API keys, sync state) is device-specific and intentionally excluded.
@@ -44,11 +45,6 @@ export class BackupSyncError extends Error {}
 export interface BackupEntry {
   id: string
   updatedAt: number
-}
-
-function authHeaders(): Record<string, string> {
-  const appAccessKey = useSettingsStore.getState().appAccessKey
-  return appAccessKey ? { 'x-app-key': appAccessKey } : {}
 }
 
 /** Uploads the current backup JSON to the server. The server keeps only the 3 most recent. */

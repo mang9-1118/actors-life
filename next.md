@@ -17,7 +17,7 @@ JSON-LD와 DOM을, 플필은 `__NEXT_DATA__`를 읽는다. 버튼도 하나, 등
 `draftFromNotice()`로 합쳐져 양식을 채운다.
 
 주소 입력칸에 필름메이커스 주소를 넣으면 서버를 부르기 전에 북마클릿을 쓰라는 안내가
-나온다 (`BOOKMARKLET_ONLY_HOSTS`).
+나온다 (`src/lib/casting.ts`의 `noticeSite()`가 필름메이커스로 판정하는 경우).
 
 ## 필름메이커스를 서버에서 읽는 건 끝난 이야기다
 
@@ -99,7 +99,7 @@ JSON-LD와 DOM을, 플필은 `__NEXT_DATA__`를 읽는다. 버튼도 하나, 등
 
 `importedNotice()`가 두 경로(우편함·해시)로 들어온 값을 모두 검증한다
 (`parseImportedNotice()`는 JSON 문자열용 껍데기다). 링크는 카드 제목의 `href`가 되므로
-**`javascript:`가 통과하면 XSS다.** 그래서 `NOTICE_HOSTS` 화이트리스트 + http(s)만 링크로
+**`javascript:`가 통과하면 XSS다.** 그래서 `noticeSite()`가 인정하는 호스트 + http(s)만 링크로
 인정하고, 나머지는 링크를 버린다(제목은 살린다). 마감일은 `YYYY-MM-DD`가 아니면 무시하고,
 오디션명이 없으면 전체를 거부한다. 지원처는 호스트가 인정된 경우에만 채운다.
 

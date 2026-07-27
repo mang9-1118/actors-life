@@ -18,6 +18,8 @@ const ALLOWED_ORIGINS = [
 /** A notice someone pressed the bookmarklet on stops being interesting quickly. */
 const MAX_AGE_MS = 30 * 60 * 1000
 
+const isStale = (blob: { uploadedAt: Date }) => Date.now() - blob.uploadedAt.getTime() >= MAX_AGE_MS
+
 /** Enough for a notice's few short fields; anything larger is not one. */
 const MAX_BYTES = 4000
 
@@ -93,7 +95,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     try {
       const { blobs } = await list({ prefix: INBOX_PREFIX })
       const fresh = blobs
-        .filter((b) => Date.now() - b.uploadedAt.getTime() < MAX_AGE_MS)
+        .filter((b) => !isStale(b))
         .sort((a, b) => b.uploadedAt.getTime() - a.uploadedAt.getTime())
 
       let notice: unknown = null
@@ -116,9 +118,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   res.status(405).json({ error: 'Method not allowed' })
 }
 
-/** Keeps a forgotten press from waiting around for the next time the app is opened. */
+/**
+ * Keeps a forgotten press from waiting around for the next time the app is opened. The
+ * GET path empties the inbox anyway, so this only matters when the app is never opened.
+ */
 async function dropStale(): Promise<void> {
   const { blobs } = await list({ prefix: INBOX_PREFIX })
-  const stale = blobs.filter((b) => Date.now() - b.uploadedAt.getTime() >= MAX_AGE_MS)
+  const stale = blobs.filter(isStale)
   if (stale.length) await del(stale.map((b) => b.url))
 }

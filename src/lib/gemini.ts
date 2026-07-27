@@ -1,4 +1,4 @@
-import { useSettingsStore } from '@/stores/useSettingsStore'
+import { authHeaders } from '@/lib/appApi'
 
 export class GeminiError extends Error {}
 
@@ -14,14 +14,9 @@ export interface GeminiTurn {
 
 /** Calls the `/api/gemini` Vercel function so the Gemini API key never ships to the client. */
 export async function generateContent(contents: GeminiTurn[]): Promise<string> {
-  const appAccessKey = useSettingsStore.getState().appAccessKey
-
   const res = await fetch('/api/gemini', {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(appAccessKey ? { 'x-app-key': appAccessKey } : {}),
-    },
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
     body: JSON.stringify({ contents }),
   })
 

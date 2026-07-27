@@ -92,7 +92,7 @@ export function AuditionFields({
  * Fills the form below from a casting notice link, so the fields the notice
  * states are not retyped. Applications made through a notice link are online.
  */
-function CastingUrlField({ onLoad }: { onLoad: (draft: Partial<AuditionDraft>) => void }) {
+function CastingUrlField({ onLoad }: { onLoad: (notice: CastingNotice) => void }) {
   const [url, setUrl] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -106,7 +106,7 @@ function CastingUrlField({ onLoad }: { onLoad: (draft: Partial<AuditionDraft>) =
     setNotice('')
     try {
       const found = await fetchCastingNotice(trimmed)
-      onLoad(draftFromNotice(found))
+      onLoad(found)
       setUrl('')
       if (!found.deadline) setNotice('공고에 마감일이 없어 마감일은 그대로 두었습니다.')
     } catch (e) {
@@ -158,8 +158,9 @@ export function AuditionForm() {
     let active = true
 
     const check = async () => {
-      if (!active || document.hidden) return
+      if (document.hidden) return
       const waiting = await takePendingNotice()
+      // Guarded after the await only: the cleanup below detaches every caller.
       if (waiting && active) fill(waiting)
     }
 
@@ -207,7 +208,7 @@ export function AuditionForm() {
   return (
     <Card>
       <CardContent className="flex flex-col gap-4">
-        <CastingUrlField onLoad={(fields) => setDraft((prev) => ({ ...prev, ...fields }))} />
+        <CastingUrlField onLoad={fill} />
         {importError && <p className="text-sm text-destructive">{importError}</p>}
         <AuditionFields draft={draft} onChange={setDraft} />
         <Button onClick={submit} className="self-start">

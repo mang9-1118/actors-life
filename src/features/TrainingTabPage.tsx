@@ -5,7 +5,7 @@ import { TRAINING_TABS } from '@/types'
 import { ScriptAnalysis1Panel, ScriptAnalysis2Panel } from '@/features/ScriptAnalysisPanels'
 import { AuditionBoard } from '@/features/AuditionBoard'
 import { AuditionForm } from '@/features/AuditionForm'
-import { CastingBookmarkletLink } from '@/features/CastingBookmarklet'
+import { CastingBookmarkletHint, CastingBookmarkletLink } from '@/features/CastingBookmarklet'
 import { ConceptSummaryPanel } from '@/features/ConceptSummaryPanel'
 import { LectureAnalysisPanel } from '@/features/LectureAnalysisPanel'
 import { Button } from '@/components/ui/button'
@@ -50,12 +50,7 @@ export function TrainingTabPage() {
               ))}
               <CastingBookmarkletLink />
             </div>
-            {/* A bookmarklet has no affordance for "drag me to the bookmarks bar", so
-                this one line stays. */}
-            <p className="text-xs text-muted-foreground">
-              <span className="font-medium">오디션 가져오기</span>를 북마크바에 끌어다 놓으면, 두
-              사이트의 공고 페이지에서 눌러 가져올 수 있습니다.
-            </p>
+            <CastingBookmarkletHint />
             <AuditionForm />
           </div>
         )}
