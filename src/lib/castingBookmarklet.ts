@@ -119,8 +119,12 @@ function readCastingNotice(appUrl: string): void {
 
   var target =
     appUrl + '#/train/audition-apply?import=' + encodeURIComponent(JSON.stringify(payload))
-  var opened = window.open(target, '_blank')
+
+  /* Named rather than '_blank' so every press after the first lands in the same app
+     tab instead of stacking up new ones. The notice page stays where it is. */
+  var opened = window.open(target, 'actorsLifeCastingImport')
   if (!opened) location.href = target
+  else if (opened.focus) opened.focus()
 }
 
 /**

@@ -50,6 +50,11 @@ JSON-LD와 DOM을, 플필은 `__NEXT_DATA__`를 읽는다. 버튼도 하나, 등
 - 값 전달은 `#/train/audition-apply?import=<encodeURIComponent(JSON)>`. 앱이 `HashRouter`라
   해시가 곧 라우트이므로 쿼리는 해시 **안**에 넣는다. 프래그먼트는 서버로 전송되지 않아
   로그에도 남지 않는다.
+- `window.open(target, 'actorsLifeCastingImport')` — `_blank`가 아니라 **이름 있는 창**이다.
+  그래서 두 번째 이후로는 새 탭이 쌓이지 않고 같은 앱 탭이 재사용된다(해시만 바뀌어도
+  `HashRouter`가 받는다). 공고 페이지는 그대로 남는다. 다만 브라우저가 아는 이름은
+  `window.open`으로 열린 탭에만 붙으므로, **사용자가 직접 열어둔 앱 탭은 재사용되지 않고
+  첫 클릭에서 탭이 하나 생긴다.** 팝업이 막히면 `location.href`로 현재 탭에서 이동한다.
 - React는 `javascript:` href를 지운다. 그래서 `CastingBookmarklet.tsx`는 마운트 후
   `setAttribute`로 직접 넣는다.
 - 공고 상세가 아닌 페이지에서 누르면 `alert`로 알린다. 사이트별로 다른 문구가 나오도록
