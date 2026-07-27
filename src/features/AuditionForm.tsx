@@ -1,7 +1,13 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useAuditionStore } from '@/stores/useAuditionStore'
-import { CastingError, fetchCastingNotice, parseImportedNotice } from '@/lib/casting'
+import {
+  CastingError,
+  fetchCastingNotice,
+  parseImportedNotice,
+  takePendingNotice,
+  type CastingNotice,
+} from '@/lib/casting'
 import type { AuditionMode } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -138,7 +144,41 @@ export function AuditionForm() {
   const [importError, setImportError] = useState('')
   const [searchParams, setSearchParams] = useSearchParams()
 
-  // Values the bookmarklet read off a 필름메이커스 notice page arrive here.
+  const fill = useCallback((notice: CastingNotice) => {
+    setImportError('')
+    setDraft((prev) => ({ ...prev, ...draftFromNotice(notice) }))
+  }, [])
+
+  /**
+   * The bookmarklet leaves notices with the server rather than reaching into this tab,
+   * which no page on a casting site is allowed to do. So the form asks whether one is
+   * waiting: when this tab is looked at again, and on a slow tick while it is visible.
+   */
+  useEffect(() => {
+    let active = true
+
+    const check = async () => {
+      if (!active || document.hidden) return
+      const waiting = await takePendingNotice()
+      if (waiting && active) fill(waiting)
+    }
+
+    check()
+    // Slow, because looking at the tab is the real trigger; this only covers pressing
+    // the bookmarklet in another window while this one is already in front. Each check
+    // is a Blob listing, so a fast tick would spend requests for nothing.
+    const timer = window.setInterval(check, 30_000)
+    document.addEventListener('visibilitychange', check)
+    window.addEventListener('focus', check)
+    return () => {
+      active = false
+      window.clearInterval(timer)
+      document.removeEventListener('visibilitychange', check)
+      window.removeEventListener('focus', check)
+    }
+  }, [fill])
+
+  // Where the bookmarklet's values land when it could not reach the server.
   useEffect(() => {
     const raw = searchParams.get('import')
     if (!raw) return
@@ -153,9 +193,8 @@ export function AuditionForm() {
       setImportError('공고 정보를 읽지 못했습니다. 공고 페이지에서 다시 눌러주세요.')
       return
     }
-    setImportError('')
-    setDraft((prev) => ({ ...prev, ...draftFromNotice(notice) }))
-  }, [searchParams, setSearchParams])
+    fill(notice)
+  }, [searchParams, setSearchParams, fill])
 
   const submit = () => {
     if (!draft.title.trim()) return

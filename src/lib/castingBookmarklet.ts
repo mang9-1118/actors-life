@@ -12,7 +12,7 @@
  * the notice page. Everything it needs is declared inside, and it carries no `//`
  * comments so the serialized single line stays valid.
  */
-function readCastingNotice(appUrl: string): void {
+function readCastingNotice(appUrl: string, appKey: string): void {
   var host = location.hostname.toLowerCase()
   var isPlfil = host.indexOf('plfil') !== -1
   var isFilmmakers = host.indexOf('filmmakers') !== -1
@@ -117,23 +117,51 @@ function readCastingNotice(appUrl: string): void {
     url: location.origin + location.pathname,
   }
 
-  var target =
-    appUrl + '#/train/audition-apply?import=' + encodeURIComponent(JSON.stringify(payload))
+  /* Left with the app's server for whichever tab has the app open to pick up, so no
+     tab is opened and the notice page is not disturbed. Opening one is the fallback
+     for when the server cannot be reached. */
+  var headers: Record<string, string> = { 'Content-Type': 'application/json' }
+  if (appKey) headers['x-app-key'] = appKey
 
-  /* Named rather than '_blank' so every press after the first lands in the same app
-     tab instead of stacking up new ones. The notice page stays where it is. */
-  var opened = window.open(target, 'actorsLifeCastingImport')
-  if (!opened) location.href = target
-  else if (opened.focus) opened.focus()
+  fetch(new URL('api/casting-inbox', appUrl).href, {
+    method: 'POST',
+    headers: headers,
+    body: JSON.stringify(payload),
+  })
+    .then(function (res) {
+      if (!res.ok) throw new Error(String(res.status))
+      var box = document.createElement('div')
+      box.textContent = '배우의 삶에 담았습니다 · ' + title
+      box.setAttribute(
+        'style',
+        'position:fixed;z-index:2147483647;left:50%;top:24px;transform:translateX(-50%);' +
+          'max-width:80vw;padding:12px 18px;border-radius:10px;background:#111;color:#fff;' +
+          'font:600 14px/1.4 system-ui,-apple-system,sans-serif;box-shadow:0 6px 24px rgba(0,0,0,.3)',
+      )
+      document.body.appendChild(box)
+      setTimeout(function () {
+        box.remove()
+      }, 2400)
+    })
+    .catch(function () {
+      var target =
+        appUrl + '#/train/audition-apply?import=' + encodeURIComponent(JSON.stringify(payload))
+      var opened = window.open(target, 'actorsLifeCastingImport')
+      if (!opened) location.href = target
+      else if (opened.focus) opened.focus()
+    })
 }
 
 /**
- * The `javascript:` URL to drag onto the bookmarks bar. `appUrl` is baked in at
- * render time, so a bookmarklet taken from the deployed app returns to it (and
- * one taken from a local build returns there).
+ * The `javascript:` URL to drag onto the bookmarks bar. Both arguments are baked in
+ * at render time: a bookmarklet taken from the deployed app returns to it (and one
+ * taken from a local build returns there), and it carries the app access key because
+ * `/api/casting-inbox` is gated like every other endpoint. That key then lives in the
+ * bookmark, so re-drag the button after changing it.
  */
-export function castingBookmarkletHref(appUrl: string): string {
-  return `javascript:void((${readCastingNotice})(${JSON.stringify(appUrl)}))`
+export function castingBookmarkletHref(appUrl: string, appKey: string): string {
+  const args = `${JSON.stringify(appUrl)},${JSON.stringify(appKey)}`
+  return `javascript:void((${readCastingNotice})(${args}))`
 }
 
 /** Where the bookmarklet sends its values, e.g. 'https://actors-life.vercel.app/'. */

@@ -30,18 +30,12 @@ function noticeHost(url: string): string {
 }
 
 /**
- * Validates what the bookmarklet put in the URL. It arrives from outside the app,
- * so nothing is trusted: the link has to be an http(s) address on a known casting
- * host before it can become the board card's `href`, and the deadline has to be a
- * date key before it can reach the store.
+ * Validates a notice the bookmarklet read. It arrives from outside the app — through
+ * the URL or through `/api/casting-inbox` — so nothing is trusted: the link has to be
+ * an http(s) address on a known casting host before it can become the board card's
+ * `href`, and the deadline has to be a date key before it can reach the store.
  */
-export function parseImportedNotice(raw: string): CastingNotice | null {
-  let data: unknown
-  try {
-    data = JSON.parse(raw)
-  } catch {
-    return null
-  }
+export function importedNotice(data: unknown): CastingNotice | null {
   if (!data || typeof data !== 'object') return null
 
   const fields = data as Record<string, unknown>
@@ -66,6 +60,35 @@ export function parseImportedNotice(raw: string): CastingNotice | null {
     category: text(fields.category),
     deadline: /^\d{4}-\d{2}-\d{2}$/.test(deadline) ? deadline : null,
     url: linkable,
+  }
+}
+
+/** The same, for a notice handed over as JSON text in the URL. */
+export function parseImportedNotice(raw: string): CastingNotice | null {
+  try {
+    return importedNotice(JSON.parse(raw))
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Takes whatever notice the bookmarklet left for this tab, emptying the inbox so it
+ * is filled in once. Returns null when nothing is waiting, and stays quiet on
+ * failure — this runs on a timer, and a warning per tick would be noise.
+ */
+export async function takePendingNotice(): Promise<CastingNotice | null> {
+  const appAccessKey = useSettingsStore.getState().appAccessKey
+
+  try {
+    const res = await fetch('/api/casting-inbox', {
+      headers: appAccessKey ? { 'x-app-key': appAccessKey } : {},
+    })
+    if (!res.ok) return null
+    const data = (await res.json()) as { notice?: unknown }
+    return data.notice ? importedNotice(data.notice) : null
+  } catch {
+    return null
   }
 }
 

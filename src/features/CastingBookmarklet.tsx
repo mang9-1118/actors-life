@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { Bookmark } from 'lucide-react'
 import { castingBookmarkletHref, currentAppUrl } from '@/lib/castingBookmarklet'
+import { useSettingsStore } from '@/stores/useSettingsStore'
 import { Button } from '@/components/ui/button'
 
 /**
@@ -10,12 +11,15 @@ import { Button } from '@/components/ui/button'
  */
 export function CastingBookmarkletLink() {
   const ref = useRef<HTMLAnchorElement>(null)
+  // Read here rather than inside the bookmarklet, which runs on the casting site and
+  // cannot see this app's settings. Changing the key means dragging the button again.
+  const appAccessKey = useSettingsStore((s) => s.appAccessKey)
 
   // Assigned outside React, which strips `javascript:` hrefs. Pressing it here
   // rather than on a notice page just says so, which is the hint it needs.
   useEffect(() => {
-    ref.current?.setAttribute('href', castingBookmarkletHref(currentAppUrl()))
-  }, [])
+    ref.current?.setAttribute('href', castingBookmarkletHref(currentAppUrl(), appAccessKey))
+  }, [appAccessKey])
 
   return (
     <Button variant="outline" size="sm" asChild>
